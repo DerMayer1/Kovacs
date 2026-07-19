@@ -1,27 +1,31 @@
 {
   "name": "kovacs",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A persistent, event-driven Staff Engineer development system powered by Codex.",
+  "description": "An explicit, read-only Staff Engineer tutoring interface powered by Codex CLI.",
   "engines": {
     "node": ">=22.0.0"
+  },
+  "bin": {
+    "kovacs": "dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
+    "start": "node dist/src/cli.js",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "v0:validate": "tsx v0/validate.ts"
+    "v0:validate": "tsx v0/validate.ts",
+    "v01:validate": "tsx v01/validate.ts",
+    "v01:smoke": "tsx v01/smoke.ts"
   },
   "dependencies": {
-    "@openai/codex-sdk": "latest"
+    "ajv": "latest",
+    "ajv-formats": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
-    "ajv": "latest",
-    "ajv-formats": "latest",
     "tsx": "latest",
     "typescript": "latest"
   }
