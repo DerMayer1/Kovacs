@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.1/profile-response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "profile", "recommendation", "assessment", "intervention", "reason", "observed_context", "checkpoint", "memory_candidates", "external_action_requests"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "0.1.0" },
+    "request_id": { "type": "string", "pattern": "^req_[a-zA-Z0-9_-]+$" },
+    "profile": { "type": "string", "enum": ["coach", "inspect", "assess", "debrief"] },
+    "recommendation": { "type": "string", "enum": ["display", "remain_silent"] },
+    "assessment": { "type": "string", "minLength": 1 },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "message", "assistance_level", "contains_complete_solution"],
+      "properties": {
+        "type": { "type": "string", "enum": ["observation", "diagnostic_question", "hint", "information", "review", "assessment_prompt", "debrief"] },
+        "message": { "type": "string", "minLength": 1 },
+        "assistance_level": { "type": "string", "enum": ["A0", "A1", "A2", "A3", "A4", "A5"] },
+        "contains_complete_solution": { "type": "boolean" }
+      }
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "observed_context": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "checkpoint": { "type": "string", "minLength": 1 },
+    "memory_candidates": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/memory_candidate" } },
+    "external_action_requests": { "type": "array", "maxItems": 0, "items": { "type": "string" } }
+  },
+  "$defs": {
+    "memory_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "memory_type", "claim", "epistemic_status", "source_event_ids", "confidence", "sensitivity", "retention", "expires_at", "evidence_reference", "requires_confirmation", "policy_version"],
+      "properties": {
+        "candidate_id": { "type": "string", "pattern": "^mem_[a-z0-9_]+$" },
+        "memory_type": { "type": "string", "enum": ["working", "episodic", "semantic", "evidence", "commitment", "pattern", "curriculum", "professional"] },
+        "claim": { "type": "string", "minLength": 1 },
+        "epistemic_status": { "type": "string", "enum": ["user_stated", "observed", "inferred", "verified"] },
+        "source_event_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^aud_[a-zA-Z0-9_-]+$" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sensitivity": { "type": "string", "enum": ["public", "internal", "sensitive"] },
+        "retention": { "type": "string", "enum": ["ephemeral", "session", "30d", "90d", "until_review"] },
+        "expires_at": { "type": ["string", "null"] },
+        "evidence_reference": { "type": ["string", "null"] },
+        "requires_confirmation": { "type": "boolean" },
+        "policy_version": { "type": "string", "const": "v0.1.0" }
+      }
+    }
+  }
+}

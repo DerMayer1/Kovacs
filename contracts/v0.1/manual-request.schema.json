@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.1/manual-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "session_id", "profile", "mode", "project", "task", "current_hypothesis", "attempts", "requested_help", "allowed_assistance", "sensitivity", "context"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "request_id": { "type": "string", "pattern": "^req_[a-zA-Z0-9_-]+$" },
+    "session_id": { "type": "string", "pattern": "^ses_[a-zA-Z0-9_-]+$" },
+    "profile": { "enum": ["coach", "inspect", "assess", "debrief"] },
+    "mode": { "enum": ["training", "pair", "assessment"] },
+    "project": { "type": "string", "minLength": 1 },
+    "task": { "type": "string", "minLength": 1 },
+    "current_hypothesis": { "type": ["string", "null"] },
+    "attempts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 20 },
+    "requested_help": { "type": "string", "minLength": 1 },
+    "allowed_assistance": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5"] },
+    "sensitivity": { "enum": ["public", "internal", "sensitive", "restricted"] },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminal", "notes", "selected_files"],
+      "properties": {
+        "terminal": { "type": "string" },
+        "notes": { "type": "string" },
+        "selected_files": { "type": "array", "items": { "type": "string" }, "maxItems": 10 }
+      }
+    }
+  }
+}
