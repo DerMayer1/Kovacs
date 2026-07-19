@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0/reasoning-response.schema.json",
+  "title": "Kovacs V0 Reasoning Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "recommendation",
+    "intervention_type",
+    "message",
+    "reason",
+    "confidence",
+    "assistance_level",
+    "checkpoint",
+    "memory_candidates",
+    "external_action_requests"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "request_id": { "type": "string", "pattern": "^req_[a-z0-9_]+$" },
+    "recommendation": { "enum": ["display", "remain_silent"] },
+    "intervention_type": {
+      "enum": ["observation", "diagnostic_question", "hint", "information", "warning", "direct_instruction", "review_offer", "assessment_prompt"]
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "assistance_level": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5", "A6"] },
+    "checkpoint": { "type": ["string", "null"] },
+    "memory_candidates": {
+      "type": "array",
+      "items": { "$ref": "https://kovacs.local/contracts/v0/memory-candidate.schema.json" }
+    },
+    "external_action_requests": {
+      "type": "array",
+      "maxItems": 0
+    }
+  }
+}

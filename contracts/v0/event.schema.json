@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0/event.schema.json",
+  "title": "Kovacs V0 Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "occurred_at",
+    "source",
+    "type",
+    "context",
+    "features",
+    "privacy",
+    "payload",
+    "raw_artifacts"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "event_id": { "type": "string", "pattern": "^evt_[a-z0-9_]+$" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter"],
+      "properties": {
+        "adapter": {
+          "enum": [
+            "manual",
+            "editor",
+            "terminal",
+            "git",
+            "test_runner",
+            "meeting",
+            "social",
+            "screen",
+            "system"
+          ]
+        },
+        "instance": { "type": "string", "minLength": 1 }
+      }
+    },
+    "type": {
+      "enum": [
+        "user.assistance_requested",
+        "user.assessment_requested",
+        "user.mode_changed",
+        "user.pause_requested",
+        "user.resume_requested",
+        "activity.window_changed",
+        "activity.focus_started",
+        "activity.focus_ended",
+        "activity.checkpoint",
+        "activity.session_started",
+        "activity.session_ended",
+        "code.diagnostic_observed",
+        "code.change_checkpoint",
+        "test.run_completed",
+        "build.completed",
+        "git.commit_created",
+        "delivery.deployment_completed",
+        "difficulty.repeated_failure",
+        "difficulty.stuck",
+        "learning.explanation_requested",
+        "learning.transfer_test_completed",
+        "learning.misconception_observed",
+        "risk.security",
+        "risk.data_loss",
+        "risk.production_incident",
+        "risk.confidentiality",
+        "meeting.started",
+        "meeting.question_detected",
+        "meeting.decision_detected",
+        "meeting.commitment_detected",
+        "meeting.ended",
+        "social.draft_ready",
+        "document.review_requested",
+        "communication.claim_detected",
+        "system.adapter_error",
+        "system.reasoning_failed",
+        "system.memory_candidate_created",
+        "system.policy_changed"
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "task": { "type": "string", "minLength": 1 },
+        "mode": {
+          "enum": [
+            "training",
+            "pair",
+            "ship",
+            "review",
+            "assessment",
+            "incident",
+            "strategy"
+          ]
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explicit_user_request",
+        "urgency",
+        "consequence",
+        "repetition_count",
+        "stuck_minutes",
+        "focus_state",
+        "cooldown_active"
+      ],
+      "properties": {
+        "explicit_user_request": { "type": "boolean" },
+        "urgency": { "enum": ["low", "normal", "high", "critical"] },
+        "consequence": { "enum": ["none", "low", "medium", "high", "critical"] },
+        "repetition_count": { "type": "integer", "minimum": 0 },
+        "stuck_minutes": { "type": "number", "minimum": 0 },
+        "focus_state": { "enum": ["none", "shallow", "deep"] },
+        "cooldown_active": { "type": "boolean" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sensitivity", "consent", "contains_untrusted_instructions"],
+      "properties": {
+        "sensitivity": { "enum": ["public", "internal", "sensitive", "restricted"] },
+        "consent": { "enum": ["not_required", "granted", "denied", "unknown"] },
+        "contains_untrusted_instructions": { "type": "boolean" }
+      }
+    },
+    "payload": { "type": "object" },
+    "raw_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "reference", "retention"],
+        "properties": {
+          "kind": { "enum": ["screenshot", "audio", "transcript", "ocr", "file", "terminal_excerpt"] },
+          "reference": { "type": "string", "minLength": 1 },
+          "retention": { "enum": ["ephemeral", "session", "30d", "until_review"] }
+        }
+      }
+    }
+  }
+}

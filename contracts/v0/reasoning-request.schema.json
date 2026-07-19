@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0/reasoning-request.schema.json",
+  "title": "Kovacs V0 Reasoning Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "profile",
+    "mode",
+    "allowed_assistance",
+    "allowed_actions",
+    "event",
+    "policy_decision",
+    "selected_context"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "request_id": { "type": "string", "pattern": "^req_[a-z0-9_]+$" },
+    "profile": { "enum": ["observe", "coach", "review", "assess", "reflect", "incident"] },
+    "mode": { "enum": ["training", "pair", "ship", "review", "assessment", "incident", "strategy"] },
+    "allowed_assistance": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5", "A6"] },
+    "allowed_actions": {
+      "type": "array",
+      "const": ["advise"]
+    },
+    "event": { "$ref": "https://kovacs.local/contracts/v0/event.schema.json" },
+    "policy_decision": { "$ref": "https://kovacs.local/contracts/v0/intervention.schema.json" },
+    "selected_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current_objective", "project_facts", "learner_evidence", "recent_attempts"],
+      "properties": {
+        "current_objective": { "type": ["string", "null"] },
+        "project_facts": { "type": "array", "items": { "type": "string" } },
+        "learner_evidence": { "type": "array", "items": { "type": "string" } },
+        "recent_attempts": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

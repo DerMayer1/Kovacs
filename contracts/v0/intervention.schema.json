@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0/intervention.schema.json",
+  "title": "Kovacs V0 Intervention Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_version",
+    "event_id",
+    "decision",
+    "intervention_type",
+    "assistance_level",
+    "reason_codes",
+    "confidence",
+    "urgency",
+    "codex_allowed",
+    "external_action_allowed",
+    "memory_disposition",
+    "raw_retention",
+    "message",
+    "checkpoint"
+  ],
+  "properties": {
+    "policy_version": { "const": "v0.1.0" },
+    "event_id": { "type": "string", "pattern": "^evt_[a-z0-9_]+$" },
+    "decision": { "enum": ["silence", "record_only", "intervene", "block"] },
+    "intervention_type": {
+      "enum": ["none", "observation", "diagnostic_question", "hint", "information", "warning", "direct_instruction", "review_offer", "assessment_prompt"]
+    },
+    "assistance_level": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5", "A6"] },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "privacy.restricted",
+          "consent.missing",
+          "risk.critical",
+          "user.explicit_request",
+          "cooldown.active",
+          "focus.protected",
+          "learning.repeated_failure",
+          "learning.stuck",
+          "meeting.question",
+          "communication.review",
+          "progress.record",
+          "noise.low_value"
+        ]
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "urgency": { "enum": ["low", "normal", "high", "critical"] },
+    "codex_allowed": { "type": "boolean" },
+    "external_action_allowed": { "const": false },
+    "memory_disposition": {
+      "enum": ["none", "audit_only", "episodic_candidate", "evidence_candidate", "commitment_candidate", "professional_candidate"]
+    },
+    "raw_retention": { "enum": ["none", "ephemeral", "session"] },
+    "message": { "type": ["string", "null"] },
+    "checkpoint": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "const": "intervene" } }, "required": ["decision"] },
+      "then": {
+        "properties": {
+          "codex_allowed": { "const": true },
+          "intervention_type": { "not": { "const": "none" } }
+        }
+      },
+      "else": { "properties": { "codex_allowed": { "const": false } } }
+    }
+  ]
+}

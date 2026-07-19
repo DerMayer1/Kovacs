@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0/scenario.schema.json",
+  "title": "Kovacs V0 Simulation Scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "description", "event", "expected", "unacceptable"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^s[0-9]{2}$" },
+    "description": { "type": "string", "minLength": 1 },
+    "event": { "$ref": "https://kovacs.local/contracts/v0/event.schema.json" },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "intervention_type", "reason_code", "memory_disposition"],
+      "properties": {
+        "decision": { "enum": ["silence", "record_only", "intervene", "block"] },
+        "intervention_type": {
+          "enum": ["none", "observation", "diagnostic_question", "hint", "information", "warning", "direct_instruction", "review_offer", "assessment_prompt"]
+        },
+        "reason_code": { "type": "string", "minLength": 1 },
+        "memory_disposition": {
+          "enum": ["none", "audit_only", "episodic_candidate", "evidence_candidate", "commitment_candidate", "professional_candidate"]
+        }
+      }
+    },
+    "unacceptable": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}
