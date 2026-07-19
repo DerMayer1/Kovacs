@@ -1,102 +1,106 @@
 # Kovacs
 
-Kovacs is a local-first, event-driven Staff Engineer development system powered by Codex.
+Kovacs V0.1 is an explicit, read-only Staff Engineer tutor powered by the local Codex CLI. It helps a learner make better engineering decisions without monitoring the screen, taking autonomous actions, or silently replacing the learner's work.
 
-## Current release: V0 passed
+## What V0.1 does
 
-V0 is an architecture-and-simulation release. It contains no monitoring or autonomous action. Its purpose is to prove the mission, boundaries, event vocabulary, memory ontology, intervention policy, privacy model, Codex execution contract, and representative behavior before runtime expansion.
+- runs only after an explicit terminal command;
+- supports Coach, Inspect, Assess, and Debrief profiles;
+- supports Training, Pair, and Assessment modes;
+- applies A0-A5 assistance ceilings and blocks Assessment answer leakage;
+- selects only user-supplied terminal text, notes, and project-contained files;
+- blocks restricted context and redacts common secret formats locally;
+- launches `codex exec` ephemerally with ignored user configuration, disabled web search, denied approval, and a read-only sandbox;
+- validates every model response before display;
+- stores temporary, auditable sessions outside the target repository;
+- never permits an external action request.
 
-Validate the V0 release gate:
-
-```text
-npm install
-npm run v0:validate
-```
-
-The V0 specification is under `docs/v0/`, machine contracts are under `contracts/v0/`, and replayable simulations are under `v0/`.
-
-The earlier SDK/SQLite implementation under `src/` is a technical spike. It is excluded from V0 acceptance. The selected first live architecture will use `codex exec` behind a neutral gateway.
-
-## Technical spike
-
-The spike demonstrated the following intelligence loop:
-
-```text
-observation -> intervention policy -> relevant memory -> Codex -> recorded outcome
-```
-
-The first version provides:
-
-- persistent SQLite learner memory;
-- sourced and confidence-scored memory records;
-- structured engineering observations;
-- an event policy that prevents continuous LLM polling;
-- persistent Codex SDK threads;
-- optional screenshot input;
-- read-only, advisory Codex operation;
-- a CLI suitable for future Windows sensors and an overlay.
+V0.1 does not monitor the screen, listen to meetings, observe social media, run continuously, edit code, or maintain a permanent learner model.
 
 ## Requirements
 
-- Windows, macOS, or Linux
-- Node.js 22+
-- An authenticated local Codex installation
+- Node.js 22 or newer
+- an authenticated local Codex CLI installation
 
-## Start
+Install and verify:
 
 ```text
 npm install
-npm run dev -- init
-npm run dev -- status
+npm run v01:validate
 ```
 
-Initialize target information:
+The automated release gate covers 18 metrics and 20 benchmark scenarios. A real Codex acceptance check is available separately because it consumes model calls:
 
 ```text
-npm run dev -- remember goal target_company "OpenAI"
-npm run dev -- remember goal technical_wedge "AI systems engineering"
+npm run v01:smoke -- C:\path\to\target-project
 ```
 
-Ask Kovacs directly:
+## Use Kovacs
+
+Start a deliberate-practice session:
 
 ```text
-npm run dev -- coach "Begin my evidence-based diagnostic interview" --mode assessment
+npm run dev -- start "C:\path\to\your-real-project" "Diagnose the failing integration test" training
 ```
 
-Record an event and allow the policy to decide whether Kovacs should intervene:
+The path above is a placeholder: replace it with an existing repository such as `C:\Users\lucas\Kovacs`. The positional form is recommended through `npm run` because some PowerShell/npm combinations consume named options.
+
+The command returns a session ID. Use it for explicit interventions:
 
 ```text
-npm run dev -- observe repeated_error "The same integration test failed three times"
+npm run dev -- coach ses_... "Help me choose the next diagnostic step" A2
 ```
 
-Attach a screenshot:
+For advanced context options, invoke the CLI directly so PowerShell passes every named option unchanged:
 
 ```text
-npm run dev -- observe manual "Inspect what I am doing" --image C:\path\screen.png
+npx tsx src/cli.ts coach --session ses_... --request "Help me choose the next diagnostic step" --hypothesis "The cache is stale" --attempt "Reproduced with one account" --assistance A2
 ```
 
-Record an event without calling Codex:
+Inspect selected evidence without edits:
 
 ```text
-npm run dev -- observe commit "Implemented the first memory schema" --no-coach
+npx tsx src/cli.ts inspect --session ses_... --request "Inspect the error boundary" --file src\api.ts --terminal-file .\last-test-output.txt --assistance A3
 ```
 
-## Current safety model
+Test your reasoning without receiving the answer:
 
-- Codex runs read-only with approvals disabled for the observation loop.
-- Restricted observations are never sent to Codex.
-- The runtime performs no automatic typing, clicking, publishing, committing, or file editing.
-- Images are referenced only when explicitly attached; automatic capture is not implemented yet.
-- Screen-derived text must be treated as untrusted data.
+```text
+npm run dev -- assess ses_... "Assess whether my concurrency model is correct" A1
+```
 
-## Next vertical
+Close the session:
 
-The next implementation milestone is a Windows tray observer with:
+```text
+npm run dev -- debrief ses_... "Debrief my reasoning and prescribe the next practice action" A2
+```
 
-1. an explicit global capture hotkey;
-2. active-window allowlisting;
-3. local screenshot redaction and short retention;
-4. event submission to this runtime;
-5. a small always-on-top Kovacs response overlay.
+Inspect the audit record:
 
-Continuous capture, meeting audio, and social-media context should be added only after the manual observation loop proves useful.
+```text
+npm run dev -- status --session ses_... --json
+```
+
+Repeat `--attempt` and `--file` to provide multiple values. Sensitivity defaults to `internal`; `restricted` requests are always blocked before Codex is called. Add `--json` to any command for machine-readable output.
+
+## Configuration
+
+- `KOVACS_DATA_DIR`: session storage; defaults to `%LOCALAPPDATA%\Kovacs\v0.1` on Windows.
+- `KOVACS_CODEX_BIN`: explicit native Codex executable path.
+- `KOVACS_CODEX_TIMEOUT_MS`: process timeout; defaults to 120000.
+- `KOVACS_CONTEXT_CHARACTER_BUDGET`: total explicit context budget; defaults to 40000.
+- `KOVACS_SELECTED_FILE_CHARACTER_LIMIT`: per-file limit; defaults to 16000.
+
+On Windows, Kovacs prefers the npm Codex package's native binary when the Microsoft Store executable rejects direct child-process execution. Model execution uses a temporary isolated Codex home containing only the existing authentication record, then deletes it.
+
+## Architecture and evidence
+
+- V0.1 charter: `docs/v0.1/00_CHARTER.md`
+- runtime boundary: `docs/v0.1/01_RUNTIME_ARCHITECTURE.md`
+- success metrics: `docs/v0.1/02_SUCCESS_METRICS.md`
+- machine contracts: `contracts/v0.1/`
+- blind-comparison benchmark: `benchmarks/v0.1/`
+- runtime: `src/v01/`
+- release validator and live smoke: `v01/`
+
+V0 remains preserved under `docs/v0/`, `contracts/v0/`, and `v0/`. V0.2 can add a consent-based durable learner model after V0.1 produces enough real sessions to justify what should be remembered.
