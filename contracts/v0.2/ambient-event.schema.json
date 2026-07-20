@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.2/ambient-event.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "occurred_at", "type", "urgency", "application", "window_title", "objective", "summary", "frame_attached", "intervention_request_id"],
+  "properties": {
+    "event_id": { "type": "string", "pattern": "^amb_[a-zA-Z0-9_-]+$" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "type": { "enum": ["day_started", "status_changed", "window_authorized", "window_blocked", "screen_changed", "focus_drift", "manual_observe", "intervention", "day_ended", "error"] },
+    "urgency": { "enum": ["normal", "important", "critical"] },
+    "application": { "type": ["string", "null"] },
+    "window_title": { "type": ["string", "null"] },
+    "objective": { "type": "string" },
+    "summary": { "type": "string", "minLength": 1 },
+    "frame_attached": { "type": "boolean" },
+    "intervention_request_id": { "type": ["string", "null"] }
+  }
+}

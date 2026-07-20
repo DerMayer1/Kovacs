@@ -97,6 +97,7 @@ export interface GatewayInvocation {
   request: ManualRequest;
   project: string;
   prompt: string;
+  imagePaths?: string[];
 }
 
 export interface GatewayExecution {
@@ -116,4 +117,5 @@ export interface ServiceResult {
   redaction_count: number;
   context_truncated: boolean;
   gateway_duration_ms: number;
+  prompt_characters: number;
 }

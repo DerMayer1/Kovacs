@@ -29,6 +29,7 @@ export interface InterventionInput {
   terminal?: string;
   notes?: string;
   selectedFiles?: string[];
+  imagePaths?: string[];
 }
 
 export interface KovacsServiceDependencies {
@@ -73,6 +74,7 @@ export class KovacsService {
         redaction_count: Number(prior.payload.redaction_count ?? 0),
         context_truncated: Boolean(prior.payload.context_truncated),
         gateway_duration_ms: Number(prior.payload.gateway_duration_ms ?? 0),
+        prompt_characters: Number(prior.payload.prompt_characters ?? 0),
       };
     }
     if (session.events.some((event) => event.request_id === requestId)) {
@@ -131,7 +133,12 @@ export class KovacsService {
 
     let execution;
     try {
-      execution = await this.dependencies.gateway.execute({ request, project: session.project, prompt });
+      execution = await this.dependencies.gateway.execute({
+        request,
+        project: session.project,
+        prompt,
+        ...(input.imagePaths?.length ? { imagePaths: input.imagePaths } : {}),
+      });
     } catch (error) {
       await this.dependencies.sessions.append(sessionId, {
         type: "gateway_failed",
@@ -163,6 +170,7 @@ export class KovacsService {
         redaction_count: context.redaction_count,
         context_truncated: context.truncated,
         gateway_duration_ms: execution.duration_ms,
+        prompt_characters: prompt.length,
       },
     });
     if (profile === "debrief") await this.dependencies.sessions.complete(sessionId, requestId);
@@ -173,6 +181,7 @@ export class KovacsService {
       redaction_count: context.redaction_count,
       context_truncated: context.truncated,
       gateway_duration_ms: execution.duration_ms,
+      prompt_characters: prompt.length,
     };
   }
 }

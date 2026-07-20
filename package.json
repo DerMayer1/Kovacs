@@ -1,6 +1,6 @@
 {
   "name": "kovacs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "An explicit, read-only Staff Engineer tutoring interface powered by Codex CLI.",
@@ -18,15 +18,23 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "v0:validate": "tsx v0/validate.ts",
     "v01:validate": "tsx v01/validate.ts",
-    "v01:smoke": "tsx v01/smoke.ts"
+    "v01:smoke": "tsx v01/smoke.ts",
+    "v02:validate": "tsx v02/validate.ts",
+    "v02:smoke": "tsx v02/smoke.ts",
+    "pet": "npm run build && electron dist/src/v02/electron/main.js"
   },
   "dependencies": {
+    "get-windows": "9.3.0",
     "ajv": "latest",
     "ajv-formats": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "electron": "43.1.1",
     "tsx": "latest",
     "typescript": "latest"
+  },
+  "overrides": {
+    "tar": "7.5.20"
   }
 }

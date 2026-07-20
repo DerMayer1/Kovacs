@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.2/ambient-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "day_id", "status", "main_goal", "objective", "project", "session_id", "started_at", "ended_at", "last_capture_at", "last_intervention_at", "events"],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "day_id": { "type": "string", "pattern": "^day_[a-zA-Z0-9_-]+$" },
+    "status": { "enum": ["idle", "observing", "paused", "private", "ended"] },
+    "main_goal": { "type": "string", "minLength": 1 },
+    "objective": { "type": "string", "minLength": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "pattern": "^ses_[a-zA-Z0-9_-]+$" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": ["string", "null"], "format": "date-time" },
+    "last_capture_at": { "type": ["string", "null"], "format": "date-time" },
+    "last_intervention_at": { "type": ["string", "null"], "format": "date-time" },
+    "events": { "type": "array", "items": { "$ref": "https://kovacs.local/contracts/v0.2/ambient-event.schema.json" } }
+  }
+}

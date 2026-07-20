@@ -65,6 +65,7 @@ export class CodexExecGateway implements ReasoningGateway {
       "--color", "never",
       "-c", 'approval_policy="never"',
       "-c", 'web_search="disabled"',
+      ...((invocation.imagePaths ?? []).flatMap((imagePath) => ["--image", imagePath])),
       "-",
     ];
     const started = performance.now();

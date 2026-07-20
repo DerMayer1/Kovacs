@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Kovacs V0.2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell" data-state="idle">
+    <header class="dragbar">
+      <div class="wordmark">KOVACS <span>V0.2</span></div>
+      <div class="header-actions"><div class="capture-state"><i></i><span id="state-label">IDLE</span></div><button id="close" class="window-close" aria-label="Close Kovacs"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+    </header>
+
+    <section class="presence">
+      <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+      <div class="pet" aria-label="Kovacs presence indicator">
+        <div class="pet-shell"><div class="eye eye-left"></div><div class="eye eye-right"></div><div class="signal"></div></div>
+      </div>
+      <div class="mode-copy"><strong id="mode-title">Standing by</strong><span id="mode-detail">Capture is off. Start the day when you are ready.</span></div>
+    </section>
+
+    <section id="start-panel" class="panel">
+      <label for="project">PROJECT</label>
+      <input id="project" autocomplete="off" spellcheck="false">
+      <label for="objective">TODAY'S OBJECTIVE</label>
+      <textarea id="objective" rows="3" maxlength="1000" placeholder="What must be true by the end of today?"></textarea>
+      <p class="goal" id="main-goal"></p>
+      <button id="start" class="primary">START DAY</button>
+    </section>
+
+    <section id="active-panel" class="panel hidden">
+      <div class="objective-block"><span>TODAY</span><strong id="active-objective"></strong></div>
+      <div id="message" class="message empty"><span>NO INTERVENTION</span><p>Kovacs will speak when the evidence justifies it.</p></div>
+      <div class="actions">
+        <button id="observe" class="primary">OBSERVE NOW</button>
+        <button id="pause">PAUSE</button>
+        <button id="private">PRIVATE</button>
+        <button id="resume" class="hidden">RESUME</button>
+        <button id="end" class="danger">END DAY</button>
+      </div>
+      <p class="shortcut">CTRL + ALT + K toggles observation</p>
+    </section>
+    <p id="error" class="error hidden"></p>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

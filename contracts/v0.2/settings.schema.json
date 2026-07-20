@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.2/settings.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "main_goal", "allowed_applications", "denied_title_patterns", "sample_interval_ms", "automatic_intervention_interval_ms", "focus_drift_ms", "manual_window_grace_ms", "frame_difference_threshold", "automatic_interventions"],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "main_goal": { "type": "string", "minLength": 1 },
+    "allowed_applications": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "denied_title_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "sample_interval_ms": { "type": "integer", "minimum": 1000 },
+    "automatic_intervention_interval_ms": { "type": "integer", "minimum": 30000 },
+    "focus_drift_ms": { "type": "integer", "minimum": 30000 },
+    "manual_window_grace_ms": { "type": "integer", "minimum": 1000, "maximum": 120000 },
+    "frame_difference_threshold": { "type": "number", "minimum": 0.01, "maximum": 1 },
+    "automatic_interventions": { "type": "boolean" }
+  }
+}
