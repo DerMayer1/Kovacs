@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -41,6 +41,40 @@ function terminateTree(child: ReturnType<typeof spawn>): void {
   }
 }
 
+function inferredJsonType(value: unknown): "string" | "number" | "boolean" | "object" | "array" | null {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return null;
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "object") return "object";
+  return null;
+}
+
+export function normalizeCodexOutputSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => normalizeCodexOutputSchema(item));
+  if (!value || typeof value !== "object") return value;
+
+  const source = value as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    // AJV enforces uniqueness after the response. Structured Outputs does not
+    // currently expose this keyword in its supported JSON Schema subset.
+    if (key === "uniqueItems") continue;
+    normalized[key] = normalizeCodexOutputSchema(item);
+  }
+
+  if (normalized.type === undefined) {
+    const constantType = inferredJsonType(normalized.const);
+    const enumValues = Array.isArray(normalized.enum) ? normalized.enum : [];
+    const enumTypes = new Set(enumValues.map((item) => inferredJsonType(item)).filter((item) => item !== null));
+    const inferred = constantType ?? (enumValues.length > 0 && enumTypes.size === 1 ? [...enumTypes][0] : null);
+    if (inferred) normalized.type = inferred;
+  }
+
+  return normalized;
+}
+
 export class CodexExecGateway implements ReasoningGateway {
   constructor(private readonly config: V01Config) {}
 
@@ -53,24 +87,28 @@ export class CodexExecGateway implements ReasoningGateway {
     const sourceCodexHome = process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
     const sourceAuth = path.join(sourceCodexHome, "auth.json");
     if (existsSync(sourceAuth)) await copyFile(sourceAuth, path.join(isolatedCodexHome, "auth.json"));
-    const args = [
-      "exec",
-      "--ephemeral",
-      "--ignore-user-config",
-      "--json",
-      "--sandbox", "read-only",
-      "--cd", invocation.project,
-      "--output-schema", invocation.outputSchemaPath ?? this.config.responseSchemaPath,
-      "--output-last-message", outputPath,
-      "--color", "never",
-      "-c", 'approval_policy="never"',
-      "-c", 'web_search="disabled"',
-      ...((invocation.imagePaths ?? []).flatMap((imagePath) => ["--image", imagePath])),
-      "-",
-    ];
     const started = performance.now();
 
     try {
+      const sourceSchemaPath = invocation.outputSchemaPath ?? this.config.responseSchemaPath;
+      const schemaSource = JSON.parse(await readFile(sourceSchemaPath, "utf8")) as unknown;
+      const codexSchemaPath = path.join(temporaryDirectory, "codex-output-schema.json");
+      await writeFile(codexSchemaPath, JSON.stringify(normalizeCodexOutputSchema(schemaSource), null, 2), "utf8");
+      const args = [
+        "exec",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--json",
+        "--sandbox", "read-only",
+        "--cd", invocation.project,
+        "--output-schema", codexSchemaPath,
+        "--output-last-message", outputPath,
+        "--color", "never",
+        "-c", 'approval_policy="never"',
+        "-c", 'web_search="disabled"',
+        ...((invocation.imagePaths ?? []).flatMap((imagePath) => ["--image", imagePath])),
+        "-",
+      ];
       const execution = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
         const childEnvironment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: isolatedCodexHome, NO_COLOR: "1" };
         delete childEnvironment.CODEX_CLI_PATH;

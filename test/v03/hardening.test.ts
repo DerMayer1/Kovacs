@@ -8,6 +8,7 @@ import { createV03Contracts } from "../../src/v03/contracts.js";
 import { V03Store } from "../../src/v03/store.js";
 import { createAmbientContracts } from "../../src/v02/contracts.js";
 import { AmbientStateStore } from "../../src/v02/state-store.js";
+import { normalizeCodexOutputSchema } from "../../src/v01/codex-exec.js";
 import type { DayProposal, SetupInput, SetupProposal } from "../../src/v03/types.js";
 
 const root = path.resolve(".");
@@ -24,6 +25,24 @@ const dayProposal: DayProposal = {
     { title: "Document result", evidence_required: "A reviewable artifact", competency: "technical_communication" },
   ], rationale: "The slice is bounded.", warnings: [],
 };
+
+test("Codex output schemas infer explicit primitive types and omit unsupported uniqueness", () => {
+  const source = {
+    type: "object",
+    properties: {
+      schema_version: { const: "0.3.0" },
+      competency: { enum: ["testing_reliability", "security_privacy"] },
+      criteria: { type: "array", uniqueItems: true, items: { type: "string" } },
+    },
+    required: ["schema_version", "competency", "criteria"],
+    additionalProperties: false,
+  };
+  const encoded = JSON.stringify(normalizeCodexOutputSchema(source));
+  assert.match(encoded, /"schema_version":\{"const":"0\.3\.0","type":"string"\}/);
+  assert.match(encoded, /"competency":\{"enum":\["testing_reliability","security_privacy"\],"type":"string"\}/);
+  assert.doesNotMatch(encoded, /uniqueItems/);
+  assert.equal(source.properties.criteria.uniqueItems, true);
+});
 
 async function fixture() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "kovacs-v031-test-"));
