@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.3/memory.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "memory_id", "kind", "claim", "source", "confidence", "sensitivity", "status", "pinned", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "memory_id": { "type": "string", "pattern": "^mem_[a-f0-9]{32}$" },
+    "kind": { "enum": ["main_goal", "routine", "context", "pattern", "lesson"] },
+    "claim": { "type": "string", "minLength": 3, "maxLength": 2000 },
+    "source": { "enum": ["user_stated", "observed", "inferred", "verified"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sensitivity": { "enum": ["public", "internal", "sensitive"] },
+    "status": { "enum": ["active", "pending_confirmation"] },
+    "pinned": { "type": "boolean" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

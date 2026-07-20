@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.3/evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_id", "day_id", "checkpoint_id", "project", "competency", "source", "assistance_level", "outcome", "confidence", "summary", "validation", "source_event_id", "created_at"],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "evidence_id": { "type": "string", "pattern": "^ev_[a-f0-9]{32}$" },
+    "day_id": { "type": "string", "pattern": "^day_[a-f0-9]{32}$" },
+    "checkpoint_id": { "type": ["string", "null"], "pattern": "^cp_[a-f0-9]{32}$" },
+    "project": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "competency": { "enum": ["software_design_implementation", "ai_systems", "debugging_operational_judgment", "architecture", "testing_reliability", "security_privacy", "product_judgment", "technical_communication", "leadership_leverage", "execution_ownership"] },
+    "source": { "enum": ["observed", "user_reported", "validated"] },
+    "assistance_level": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5"] },
+    "outcome": { "enum": ["achieved", "partially_achieved", "blocked", "misdirected"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "summary": { "type": "string", "minLength": 3, "maxLength": 2000 },
+    "validation": { "type": ["string", "null"], "maxLength": 2000 },
+    "source_event_id": { "type": ["string", "null"], "maxLength": 100 },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}
