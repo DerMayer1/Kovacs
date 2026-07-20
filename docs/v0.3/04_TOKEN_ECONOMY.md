@@ -31,4 +31,4 @@ Only one ambient reasoning request runs at a time. Structured summaries replace 
 
 ## Metrics
 
-V0.3 records invocation reason, urgency, duration, prompt characters, whether an image was attached, cache status, outcome, and timestamp. Prompt characters are a stable local context-size proxy; they are not presented as an exact provider token or billing count.
+V0.3.1 records invocation reason, urgency, duration, prompt and response characters, whether an image was attached, cache status, completion state, response use, and timestamp. Characters are stable local context-size proxies; they are not presented as exact provider tokens or billing counts.

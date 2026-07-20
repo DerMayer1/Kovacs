@@ -7,8 +7,10 @@ Every retained evidence item includes source, project, day, competency, assistan
 Sources are intentionally distinct:
 
 - `observed`: Kovacs saw relevant activity, but the result is not proven;
-- `user_reported`: the user stated an outcome;
-- `validated`: a concrete test, artifact, review, or other validation was supplied.
+- `self_reported`: the user stated an outcome;
+- `tool_verified`: an identified tool produced the validation;
+- `artifact_verified`: a concrete artifact supports the claim;
+- `reviewed`: the claim received an explicit later review.
 
 Observation alone never proves competence.
 
