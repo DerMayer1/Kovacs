@@ -1,9 +1,9 @@
 {
   "name": "kovacs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "An explicit, read-only Staff Engineer tutoring interface powered by Codex CLI.",
+  "description": "A local-first, evidence-driven Staff Engineer operating system powered by Codex CLI.",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -21,7 +21,10 @@
     "v01:smoke": "tsx v01/smoke.ts",
     "v02:validate": "tsx v02/validate.ts",
     "v02:smoke": "tsx v02/smoke.ts",
-    "pet": "npm run build && electron dist/src/v02/electron/main.js"
+    "v03:validate": "tsx v03/validate.ts",
+    "v03:smoke": "tsx v03/smoke.ts",
+    "pet:v02": "npm run build && electron dist/src/v02/electron/main.js",
+    "pet": "npm run build && electron dist/src/v03/electron/main.js"
   },
   "dependencies": {
     "get-windows": "9.3.0",
