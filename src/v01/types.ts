@@ -98,6 +98,7 @@ export interface GatewayInvocation {
   project: string;
   prompt: string;
   imagePaths?: string[];
+  outputSchemaPath?: string;
 }
 
 export interface GatewayExecution {

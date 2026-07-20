@@ -60,7 +60,7 @@ export class CodexExecGateway implements ReasoningGateway {
       "--json",
       "--sandbox", "read-only",
       "--cd", invocation.project,
-      "--output-schema", this.config.responseSchemaPath,
+      "--output-schema", invocation.outputSchemaPath ?? this.config.responseSchemaPath,
       "--output-last-message", outputPath,
       "--color", "never",
       "-c", 'approval_policy="never"',
