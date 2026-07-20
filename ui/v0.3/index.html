@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Kovacs V0.3</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell" data-state="idle">
+    <header class="dragbar">
+      <div class="wordmark">KOVACS <span>V0.3</span></div>
+      <div class="header-actions">
+        <div class="capture-state"><i></i><span id="state-label">IDLE</span></div>
+        <button id="close" class="window-close" aria-label="Close Kovacs"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+    </header>
+
+    <section class="presence">
+      <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+      <div class="pet" aria-label="Kovacs presence indicator"><div class="pet-shell"><div class="eye eye-left"></div><div class="eye eye-right"></div><div class="signal"></div></div></div>
+      <div class="mode-copy"><strong id="mode-title">Standing by</strong><span id="mode-detail">Configure the operating system to begin.</span></div>
+      <div id="usage" class="usage hidden"><span id="usage-calls">0 calls</span><span id="usage-context">0 chars</span></div>
+    </section>
+
+    <nav id="tabs" class="tabs hidden" aria-label="Kovacs sections">
+      <button data-tab="today" class="active">TODAY</button>
+      <button data-tab="growth">GROWTH</button>
+      <button data-tab="memory">MEMORY</button>
+    </nav>
+
+    <div class="viewport">
+      <section id="setup-view" class="view">
+        <div class="section-heading"><span>INITIAL CALIBRATION</span><strong>Build the first 90-day mission</strong><p>Competencies begin unverified. Kovacs will infer nothing from titles or self-ratings.</p></div>
+        <div id="setup-form" class="form-stack">
+          <label for="current-position">CURRENT POSITION</label><textarea id="current-position" rows="2" maxlength="1000" placeholder="Your current role, experience, and working reality"></textarea>
+          <label for="available-hours">HOURS AVAILABLE / WEEK</label><input id="available-hours" type="number" min="1" max="100" value="20">
+          <label for="active-projects">ACTIVE PROJECTS</label><textarea id="active-projects" rows="2" maxlength="2000" placeholder="Projects that can produce real evidence"></textarea>
+          <label for="weaknesses">GROWTH EDGES</label><textarea id="weaknesses" rows="2" maxlength="2000" placeholder="Where your judgment or execution currently breaks down"></textarea>
+          <label for="desired-outcome">DESIRED 90-DAY OUTCOME</label><textarea id="desired-outcome" rows="3" maxlength="2000" placeholder="What must be demonstrably different in 90 days?"></textarea>
+          <button id="draft-setup" class="primary">DRAFT OPERATING SYSTEM</button>
+        </div>
+        <div id="setup-proposal" class="proposal hidden"></div>
+      </section>
+
+      <section id="today-view" class="view hidden">
+        <div id="hierarchy" class="hierarchy"></div>
+        <div id="day-start" class="form-stack">
+          <label for="project">PRIMARY PROJECT</label><input id="project" autocomplete="off" spellcheck="false">
+          <label for="objective">TODAY'S OBJECTIVE</label><textarea id="objective" rows="3" maxlength="1000" placeholder="What must be true by the end of today?"></textarea>
+          <button id="draft-day" class="primary">DRAFT TODAY'S PLAN</button>
+          <details class="week-control"><summary>START A NEW ROLLING WEEK</summary>
+            <label for="week-priorities">PRIORITIES</label><textarea id="week-priorities" rows="2" maxlength="2000" placeholder="What matters most this week?"></textarea>
+            <label for="week-constraints">CONSTRAINTS</label><textarea id="week-constraints" rows="2" maxlength="2000" placeholder="Time, dependencies, deadlines"></textarea>
+            <button id="draft-week">DRAFT NEW WEEK</button>
+          </details>
+        </div>
+        <div id="week-proposal" class="proposal hidden"></div>
+        <div id="day-proposal" class="proposal hidden"></div>
+
+        <div id="active-day" class="hidden">
+          <div class="objective-card"><span>TODAY</span><strong id="active-objective"></strong><p id="progress"></p></div>
+          <div id="checkpoints" class="checkpoint-list"></div>
+          <div id="intervention" class="intervention empty"><span>NO INTERVENTION</span><p>Kovacs will speak when the evidence justifies it.</p></div>
+          <div class="actions">
+            <button id="observe" class="primary">OBSERVE NOW</button><button id="pause">PAUSE</button><button id="private">PRIVATE</button><button id="resume" class="hidden">RESUME</button><button id="open-end" class="danger">END DAY</button>
+          </div>
+          <form id="checkpoint-form" class="evidence-form hidden">
+            <span>CLOSE ACTIVE CHECKPOINT</span>
+            <select id="checkpoint-outcome"><option value="achieved">Achieved</option><option value="partially_achieved">Partially achieved</option><option value="blocked">Blocked</option></select>
+            <textarea id="checkpoint-result" rows="2" maxlength="2000" placeholder="Concrete result"></textarea>
+            <textarea id="checkpoint-validation" rows="2" maxlength="2000" placeholder="Test, artifact, review, or other validation"></textarea>
+            <label for="assistance">ASSISTANCE USED</label><select id="assistance"><option>A0</option><option>A1</option><option selected>A2</option><option>A3</option><option>A4</option><option>A5</option></select>
+            <div class="form-actions"><button type="submit" class="primary">RECORD EVIDENCE</button><button type="button" id="cancel-checkpoint">CANCEL</button></div>
+          </form>
+          <form id="end-form" class="evidence-form hidden">
+            <span>END-OF-DAY EVIDENCE</span>
+            <select id="day-outcome"><option value="achieved">Achieved</option><option value="partially_achieved">Partially achieved</option><option value="blocked">Blocked</option><option value="misdirected">Misdirected</option></select>
+            <textarea id="day-output" rows="2" maxlength="3000" placeholder="Concrete output produced"></textarea>
+            <textarea id="day-validation" rows="2" maxlength="3000" placeholder="How the output was validated"></textarea>
+            <textarea id="day-lesson" rows="2" maxlength="2000" placeholder="One lesson worth retaining"></textarea>
+            <div class="form-actions"><button type="submit" class="danger solid">END &amp; DEBRIEF</button><button type="button" id="cancel-end">CANCEL</button></div>
+          </form>
+          <p class="shortcut">CTRL + ALT + K toggles observation</p>
+        </div>
+      </section>
+
+      <section id="growth-view" class="view hidden"><div class="section-heading"><span>EVIDENCE, NOT ACTIVITY</span><strong>Staff Engineer competencies</strong><p>Levels change only when practice produces sourced outcomes.</p></div><div id="competencies" class="competency-list"></div></section>
+      <section id="memory-view" class="view hidden"><div class="section-heading"><span>LOCAL MEMORY</span><strong>What Kovacs believes</strong><p>Review, confirm, pin, or delete every durable record.</p></div><div id="memories" class="memory-list"></div></section>
+    </div>
+    <p id="error" class="error hidden"></p>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>
