@@ -1,106 +1,108 @@
 # Kovacs
 
-Kovacs V0.1 is an explicit, read-only Staff Engineer tutor powered by the local Codex CLI. It helps a learner make better engineering decisions without monitoring the screen, taking autonomous actions, or silently replacing the learner's work.
+Kovacs V0.3 is a visible, local-first Daily Staff Engineer Operating System for Windows. It connects a confirmed 90-day mission to a rolling weekly outcome, a daily objective, and evidence-bearing checkpoints. The always-on-top pet retains the V0.2 privacy-aware observer while competence and memory remain structured, local, and inspectable.
 
-## What V0.1 does
+The main goal is fixed and visible:
 
-- runs only after an explicit terminal command;
-- supports Coach, Inspect, Assess, and Debrief profiles;
-- supports Training, Pair, and Assessment modes;
-- applies A0-A5 assistance ceilings and blocks Assessment answer leakage;
-- selects only user-supplied terminal text, notes, and project-contained files;
-- blocks restricted context and redacts common secret formats locally;
-- launches `codex exec` ephemerally with ignored user configuration, disabled web search, denied approval, and a read-only sandbox;
-- validates every model response before display;
-- stores temporary, auditable sessions outside the target repository;
-- never permits an external action request.
+> Become an Elite AI Systems Staff Engineer, using OpenAI as the benchmark of engineering efficiency, judgment, and impact.
 
-V0.1 does not monitor the screen, listen to meetings, observe social media, run continuously, edit code, or maintain a permanent learner model.
+## V0.3.0 behavior
 
-## Requirements
+- First run asks for your current position, available time, active projects, growth edges, and desired 90-day outcome.
+- Codex CLI drafts the 90-day mission and first rolling week; neither becomes durable until you confirm it.
+- Each day, Kovacs may challenge a vague or low-value objective and proposes measurable checkpoints.
+- Observation begins only after you approve the daily plan.
+- Checkpoint evidence records result, validation, outcome, competency, and A0-A5 assistance used.
+- Competencies begin `unverified` and advance only through sourced practice outcomes.
+- End Day is explicitly triggered and requires output, validation, lesson, and outcome classification.
+- Memory and usage telemetry are stored in local SQLite and exposed in the pet.
+- Raw screenshots remain ephemeral. Captured pixels, transcripts, audio, and authentication data are not stored.
+- Kovacs advises and drafts only. It cannot click, type, send, submit, publish, commit, or perform post-session actions.
 
-- Node.js 22 or newer
-- an authenticated local Codex CLI installation
+Meeting Mode, Google Meet captions, Career Mode, direct OpenAI API integration, and autonomous computer actions are reserved for later versions.
 
-Install and verify:
+## Install and verify
 
-```text
+Requirements:
+
+- Windows 10 or 11
+- Node.js 22.12 or newer
+- authenticated local Codex CLI
+
+```powershell
+cd C:\Users\lucas\Kovacs
 npm install
-npm run v01:validate
+npm run v03:validate
 ```
 
-The automated release gate covers 18 metrics and 20 benchmark scenarios. A real Codex acceptance check is available separately because it consumes model calls:
+The release gate runs V0, V0.1, and V0.2 regressions, contracts, lifecycle tests, SQLite restart tests, privacy checks, Electron security checks, build verification, and dependency audit.
 
-```text
-npm run v01:smoke -- C:\path\to\target-project
+## Launch
+
+```powershell
+npm run pet
 ```
 
-## Use Kovacs
+First run:
 
-Start a deliberate-practice session:
+1. Complete Initial Calibration.
+2. Review and confirm the proposed 90-day mission and first week.
+3. Enter the primary project and today's objective.
+4. Review and approve the daily plan.
+5. Work in authorized applications and record evidence at each checkpoint.
+6. Explicitly select End Day and provide output, validation, and lesson.
+
+`Ctrl + Alt + K` toggles observation. Pause and Private perform no capture.
+
+## Local data
+
+V0.3 data is stored outside target repositories:
 
 ```text
-npm run dev -- start "C:\path\to\your-real-project" "Diagnose the failing integration test" training
+%LOCALAPPDATA%\Kovacs\v0.3\kovacs.db
+%LOCALAPPDATA%\Kovacs\v0.3\ambient\
+%LOCALAPPDATA%\Kovacs\v0.3\v01-sessions\
 ```
 
-The path above is a placeholder: replace it with an existing repository such as `C:\Users\lucas\Kovacs`. The positional form is recommended through `npm run` because some PowerShell/npm combinations consume named options.
+The SQLite database contains confirmed goals, plans, checkpoints, evidence, competency state, editable memories, and model-call telemetry. It does not contain screenshot bytes.
 
-The command returns a session ID. Use it for explicit interventions:
+V0.2 authorization settings are created under the V0.3 ambient directory. Denied title patterns still override the application allowlist.
 
-```text
+## Commands
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+npm run v03:smoke
+npm run v03:validate
+npm run pet
+```
+
+The previous pet remains launchable with:
+
+```powershell
+npm run pet:v02
+```
+
+The V0.1 terminal tutor remains available:
+
+```powershell
+npm run dev -- start "C:\path\to\project" "Diagnose the failing integration test" training
 npm run dev -- coach ses_... "Help me choose the next diagnostic step" A2
 ```
 
-For advanced context options, invoke the CLI directly so PowerShell passes every named option unchanged:
+## Architecture
 
-```text
-npx tsx src/cli.ts coach --session ses_... --request "Help me choose the next diagnostic step" --hypothesis "The cache is stale" --attempt "Reproduced with one account" --assistance A2
-```
+- charter: `docs/v0.3/00_CHARTER.md`
+- architecture: `docs/v0.3/01_ARCHITECTURE.md`
+- state machine: `docs/v0.3/02_STATE_MACHINE.md`
+- memory and competence: `docs/v0.3/03_MEMORY_AND_COMPETENCE.md`
+- token economy: `docs/v0.3/04_TOKEN_ECONOMY.md`
+- success metrics: `docs/v0.3/05_SUCCESS_METRICS.md`
+- contracts: `contracts/v0.3/`
+- runtime: `src/v03/`
+- pet renderer: `ui/v0.3/`
+- validation and smoke: `v03/`
 
-Inspect selected evidence without edits:
-
-```text
-npx tsx src/cli.ts inspect --session ses_... --request "Inspect the error boundary" --file src\api.ts --terminal-file .\last-test-output.txt --assistance A3
-```
-
-Test your reasoning without receiving the answer:
-
-```text
-npm run dev -- assess ses_... "Assess whether my concurrency model is correct" A1
-```
-
-Close the session:
-
-```text
-npm run dev -- debrief ses_... "Debrief my reasoning and prescribe the next practice action" A2
-```
-
-Inspect the audit record:
-
-```text
-npm run dev -- status --session ses_... --json
-```
-
-Repeat `--attempt` and `--file` to provide multiple values. Sensitivity defaults to `internal`; `restricted` requests are always blocked before Codex is called. Add `--json` to any command for machine-readable output.
-
-## Configuration
-
-- `KOVACS_DATA_DIR`: session storage; defaults to `%LOCALAPPDATA%\Kovacs\v0.1` on Windows.
-- `KOVACS_CODEX_BIN`: explicit native Codex executable path.
-- `KOVACS_CODEX_TIMEOUT_MS`: process timeout; defaults to 120000.
-- `KOVACS_CONTEXT_CHARACTER_BUDGET`: total explicit context budget; defaults to 40000.
-- `KOVACS_SELECTED_FILE_CHARACTER_LIMIT`: per-file limit; defaults to 16000.
-
-On Windows, Kovacs prefers the npm Codex package's native binary when the Microsoft Store executable rejects direct child-process execution. Model execution uses a temporary isolated Codex home containing only the existing authentication record, then deletes it.
-
-## Architecture and evidence
-
-- V0.1 charter: `docs/v0.1/00_CHARTER.md`
-- runtime boundary: `docs/v0.1/01_RUNTIME_ARCHITECTURE.md`
-- success metrics: `docs/v0.1/02_SUCCESS_METRICS.md`
-- machine contracts: `contracts/v0.1/`
-- blind-comparison benchmark: `benchmarks/v0.1/`
-- runtime: `src/v01/`
-- release validator and live smoke: `v01/`
-
-V0 remains preserved under `docs/v0/`, `contracts/v0/`, and `v0/`. V0.2 can add a consent-based durable learner model after V0.1 produces enough real sessions to justify what should be remembered.
+Codex CLI runs ephemerally with ignored user configuration, denied approval, disabled web search, a read-only sandbox, and schema-constrained output. Local deterministic logic owns routine state so model calls remain attributable and economically justified.
