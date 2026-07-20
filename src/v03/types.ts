@@ -16,11 +16,16 @@ export const COMPETENCIES = [
 
 export const COMPETENCY_LEVELS = ["unverified", "emerging", "practiced", "reliable", "independent", "leverage"] as const;
 export const DAY_OUTCOMES = ["achieved", "partially_achieved", "blocked", "misdirected"] as const;
+export const EVIDENCE_SOURCES = ["self_reported", "observed", "tool_verified", "artifact_verified", "reviewed"] as const;
+export const CHECKPOINT_STATUSES = ["pending", "active", "completed", "blocked", "deferred", "abandoned"] as const;
+export const INTERVENTION_FEEDBACK_KINDS = ["useful", "not_useful", "wrong_context", "unnecessary_interruption", "already_known", "expanded"] as const;
 
 export type Competency = (typeof COMPETENCIES)[number];
 export type CompetencyLevel = (typeof COMPETENCY_LEVELS)[number];
 export type DayOutcome = (typeof DAY_OUTCOMES)[number];
-export type EvidenceSource = "observed" | "user_reported" | "validated";
+export type EvidenceSource = (typeof EVIDENCE_SOURCES)[number];
+export type CheckpointStatus = (typeof CHECKPOINT_STATUSES)[number];
+export type InterventionFeedbackKind = (typeof INTERVENTION_FEEDBACK_KINDS)[number];
 export type MemoryStatus = "active" | "pending_confirmation";
 
 export interface SetupInput {
@@ -106,7 +111,8 @@ export interface Checkpoint {
   title: string;
   evidence_required: string;
   competency: Competency;
-  status: "pending" | "active" | "completed" | "skipped";
+  status: CheckpointStatus;
+  status_reason: string | null;
   completed_at: string | null;
 }
 
@@ -126,6 +132,26 @@ export interface DailyPlan {
   started_at: string;
   ended_at: string | null;
   checkpoints: Checkpoint[];
+  revision: number;
+  deterministic_summary: DaySummary | null;
+}
+
+export interface DaySummary {
+  schema_version: "0.3.1";
+  planned_objective: string;
+  final_objective: string;
+  planned_checkpoints: number;
+  completed_checkpoints: number;
+  blocked_checkpoints: number;
+  deferred_checkpoints: number;
+  abandoned_checkpoints: number;
+  incomplete_checkpoints: number;
+  output_summary: string;
+  validation_summary: string;
+  lesson: string;
+  outcome: DayOutcome;
+  weekly_outcome: string;
+  carry_forward: string[];
 }
 
 export interface EvidenceRecord {
@@ -170,8 +196,40 @@ export interface MemoryRecord {
 export interface UsageSummary {
   invocation_count: number;
   prompt_characters: number;
+  response_characters: number;
   total_latency_ms: number;
   image_invocations: number;
+  failed_invocations: number;
+  interrupted_invocations: number;
+  discarded_invocations: number;
+  average_latency_ms: number;
+}
+
+export interface RecoveryStatus {
+  schema_version: "0.3.1";
+  database_integrity: "ok";
+  schema_version_applied: "0.3.1";
+  resumed_day_id: string | null;
+  pending_draft_kind: "setup" | "week" | "day" | null;
+  interrupted_invocations: number;
+  observation_requires_manual_resume: boolean;
+}
+
+export interface RetentionPolicy {
+  schema_version: "0.3.1";
+  memory_retention_days: number | null;
+  sensitive_memory_retention_days: number;
+  persist_window_titles: false;
+  last_pruned_at: string | null;
+}
+
+export interface InterventionFeedback {
+  feedback_id: string;
+  request_id: string;
+  day_id: string | null;
+  kind: InterventionFeedbackKind;
+  note: string | null;
+  created_at: string;
 }
 
 export interface OperatingSnapshot {
@@ -181,8 +239,12 @@ export interface OperatingSnapshot {
   pending_week: PendingDraft<WeekProposal> | null;
   pending_day: PendingDraft<DayProposal> | null;
   competencies: CompetencyRecord[];
+  recent_evidence: EvidenceRecord[];
   memories: MemoryRecord[];
   usage_today: UsageSummary;
+  recovery: RecoveryStatus;
+  retention: RetentionPolicy;
+  recent_feedback: InterventionFeedback[];
 }
 
 export interface V03Update {
@@ -198,6 +260,18 @@ export interface CheckpointCompletionInput {
   result: string;
   validation: string;
   assistance_level: AssistanceLevel;
+  evidence_source?: Extract<EvidenceSource, "self_reported" | "tool_verified" | "artifact_verified">;
+}
+
+export interface CheckpointTransitionInput {
+  checkpoint_id: string;
+  status: Extract<CheckpointStatus, "active" | "blocked" | "deferred" | "abandoned">;
+  reason: string;
+}
+
+export interface ObjectiveRevisionInput {
+  objective: string;
+  reason: string;
 }
 
 export interface EndDayInput {
@@ -205,6 +279,7 @@ export interface EndDayInput {
   output_summary: string;
   validation_summary: string;
   lesson: string;
+  evidence_source?: Extract<EvidenceSource, "self_reported" | "tool_verified" | "artifact_verified">;
 }
 
 export interface PlannerExecution<T> {
