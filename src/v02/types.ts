@@ -73,7 +73,7 @@ export interface AmbientReasoningTelemetry {
   prompt_characters: number;
   image_attached: boolean;
   cached: boolean;
-  outcome: "displayed";
+  outcome: "displayed" | "failed";
 }
 
 export interface AmbientControllerOptions {

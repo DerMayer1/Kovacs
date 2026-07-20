@@ -23,7 +23,14 @@ export class AmbientStateStore {
   async loadState(): Promise<AmbientState | null> {
     try {
       const value: unknown = JSON.parse(await readFile(this.statePath, "utf8"));
-      this.contracts.validateState(value); return value;
+      this.contracts.validateState(value);
+      const state = value as AmbientState;
+      const containedWindowTitles = state.events.some((event) => event.window_title !== null);
+      if (containedWindowTitles) {
+        state.events.forEach((event) => { event.window_title = null; });
+        await this.saveState(state);
+      }
+      return state;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;

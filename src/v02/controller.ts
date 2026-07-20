@@ -45,7 +45,10 @@ export class AmbientController {
   private event(type: AmbientEvent["type"], summary: string, options: Partial<Pick<AmbientEvent, "urgency" | "application" | "window_title" | "frame_attached" | "intervention_request_id">> = {}): AmbientEvent {
     return {
       event_id: id("amb"), occurred_at: new Date().toISOString(), type, urgency: options.urgency ?? "normal",
-      application: options.application ?? null, window_title: options.window_title ?? null,
+      application: options.application ?? null,
+      // Window titles remain transient reasoning context. They may contain client,
+      // document, URL, or account data and are never written to ambient state.
+      window_title: null,
       objective: this.state?.objective ?? "", summary, frame_attached: options.frame_attached ?? false,
       intervention_request_id: options.intervention_request_id ?? null,
     };
@@ -70,6 +73,15 @@ export class AmbientController {
     this.state.status = status; this.previousFrame = null; this.blockedSince = null; this.focusDriftReported = false;
     await this.store.append(this.state, this.event("status_changed", `Observation status changed to ${status}.`));
     this.emit(`Kovacs is ${status}.`); return this.state;
+  }
+
+  async reviseObjective(objective: string): Promise<AmbientState> {
+    if (!this.state || this.state.status === "ended") throw new Error("No active day exists.");
+    if (!objective.trim()) throw new Error("Today's objective cannot be empty.");
+    this.state.objective = objective.trim();
+    await this.store.append(this.state, this.event("status_changed", "The user revised the active daily objective."));
+    this.emit("Ambient coaching context updated to the revised objective.");
+    return this.state;
   }
 
   private async authorizedWindow(): Promise<ActiveWindowInfo | null> {
@@ -130,6 +142,7 @@ export class AmbientController {
     this.busy = true;
     const temporary = await mkdtemp(path.join(os.tmpdir(), "kovacs-observation-"));
     const imagePath = path.join(temporary, "active-window.png");
+    const started = Date.now();
     try {
       await writeFile(imagePath, png, { flag: "wx" });
       const operatingContext = await this.options.operatingContext?.() ?? "";
@@ -154,6 +167,10 @@ export class AmbientController {
       this.emit(result.response.intervention.message, result.response);
     } catch (error) {
       await this.store.append(this.state, this.event("error", `Intervention failed safely: ${(error as Error).message}`, { urgency, application: window.application }));
+      await this.options.onReasoningComplete?.({
+        reason: manual ? "manual_observation" : "automatic_observation", urgency, occurred_at: new Date().toISOString(),
+        duration_ms: Date.now() - started, prompt_characters: 0, image_attached: true, cached: false, outcome: "failed",
+      });
       this.emit(`Intervention failed safely: ${(error as Error).message}`); throw error;
     } finally {
       this.busy = false;
@@ -164,10 +181,18 @@ export class AmbientController {
   async endDay(operatingNotes = ""): Promise<void> {
     if (!this.state || this.state.status === "ended") throw new Error("No active day exists.");
     this.state.status = "paused";
-    const result = await this.service.intervene(this.state.session_id, "debrief", {
-      requestedHelp: `End the active day. Debrief progress toward today's objective: ${this.state.objective}`, allowedAssistance: "A2", sensitivity: "internal",
-      notes: `Structured ambient events recorded: ${this.state.events.length}. No raw frames were retained.\n${operatingNotes}`,
-    });
+    const started = Date.now();
+    let result: Awaited<ReturnType<KovacsService["intervene"]>>;
+    try {
+      result = await this.service.intervene(this.state.session_id, "debrief", {
+        requestedHelp: `End the active day. Debrief progress toward today's objective: ${this.state.objective}`, allowedAssistance: "A2", sensitivity: "internal",
+        notes: `Structured ambient events recorded: ${this.state.events.length}. No raw frames were retained.\n${operatingNotes}`,
+      });
+    } catch (error) {
+      await this.store.append(this.state, this.event("error", `End Day debrief failed safely: ${(error as Error).message}`, { urgency: "important" }));
+      await this.options.onReasoningComplete?.({ reason: "end_day", urgency: "important", occurred_at: new Date().toISOString(), duration_ms: Date.now() - started, prompt_characters: 0, image_attached: false, cached: false, outcome: "failed" });
+      this.emit(`End Day failed safely: ${(error as Error).message}`); throw error;
+    }
     await this.options.onReasoningComplete?.({
       reason: "end_day", urgency: "important", occurred_at: new Date().toISOString(),
       duration_ms: result.gateway_duration_ms, prompt_characters: result.prompt_characters,
