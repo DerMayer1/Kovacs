@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell } from "electron";
 import path from "node:path";
 import { KovacsService } from "../../v01/service.js";
 import { createAmbientContracts } from "../../v02/contracts.js";
@@ -11,9 +11,9 @@ import { createV03Contracts } from "../contracts.js";
 import { V03Controller } from "../controller.js";
 import { CodexV03Planner } from "../planner.js";
 import { V03Store } from "../store.js";
-import { DAY_OUTCOMES } from "../types.js";
+import { CHECKPOINT_STATUSES, DAY_OUTCOMES, EVIDENCE_SOURCES, INTERVENTION_FEEDBACK_KINDS } from "../types.js";
 
-if (process.platform !== "win32") throw new Error("Kovacs V0.3 pet currently supports Windows only.");
+if (process.platform !== "win32") throw new Error("Kovacs V0.3.1 pet currently supports Windows only.");
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const config = loadV03Config();
@@ -36,7 +36,7 @@ function createPet(): BrowserWindow {
   const window = new BrowserWindow({
     width: 460, height: 780, minWidth: 390, minHeight: 600, show: false, frame: false, transparent: true,
     alwaysOnTop: true, resizable: true, maximizable: false, fullscreenable: false, skipTaskbar: false,
-    backgroundColor: "#00000000", title: "Kovacs V0.3",
+    backgroundColor: "#00000000", title: "Kovacs V0.3.1",
     webPreferences: {
       preload: path.join(config.applicationRoot, "ui", "v0.3", "preload.cjs"),
       contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false,
@@ -83,16 +83,21 @@ async function bootstrap(): Promise<void> {
     });
   });
   ipcMain.handle("v03:setup:confirm", (_event, value: unknown) => controller.confirmSetup(text(payload(value, "setup confirmation").draft_id, "Draft identifier", 100)));
+  ipcMain.handle("v03:setup:revise", (_event, value: unknown) => { const input = payload(value, "setup revision"); return controller.reviseSetupDraft(text(input.draft_id, "Draft identifier", 100), payload(input.proposal, "setup proposal") as never, text(input.reason, "Revision reason", 1000)); });
   ipcMain.handle("v03:week:draft", (_event, value: unknown) => {
     const input = payload(value, "week");
     return controller.draftWeek({ priorities: text(input.priorities, "Weekly priorities", 2000), constraints: text(input.constraints, "Weekly constraints", 2000) });
   });
   ipcMain.handle("v03:week:confirm", (_event, value: unknown) => controller.confirmWeek(text(payload(value, "week confirmation").draft_id, "Draft identifier", 100)));
+  ipcMain.handle("v03:week:revise", (_event, value: unknown) => { const input = payload(value, "week revision"); return controller.reviseWeekDraft(text(input.draft_id, "Draft identifier", 100), payload(input.proposal, "week proposal") as never, text(input.reason, "Revision reason", 1000)); });
   ipcMain.handle("v03:day:draft", (_event, value: unknown) => {
     const input = payload(value, "day");
     return controller.draftDay(text(input.project, "Project", 2048), text(input.objective, "Objective", 1000));
   });
   ipcMain.handle("v03:day:confirm", (_event, value: unknown) => controller.confirmDay(text(payload(value, "day confirmation").draft_id, "Draft identifier", 100)));
+  ipcMain.handle("v03:draft:reject", (_event, value: unknown) => { const input = payload(value, "draft rejection"); return controller.rejectDraft(text(input.draft_id, "Draft identifier", 100), text(input.reason, "Rejection reason", 1000)); });
+  ipcMain.handle("v03:day:draft:revise", (_event, value: unknown) => { const input = payload(value, "draft revision"); return controller.reviseDayDraft(text(input.draft_id, "Draft identifier", 100), payload(input.proposal, "day proposal") as never, text(input.reason, "Revision reason", 1000)); });
+  ipcMain.handle("v03:day:objective", (_event, value: unknown) => { const input = payload(value, "objective revision"); return controller.reviseActiveObjective({ objective: text(input.objective, "Objective", 1000), reason: text(input.reason, "Revision reason", 1000) }); });
   ipcMain.handle("v03:status", (_event, value: unknown) => {
     const status = payload(value, "status").status;
     if (status !== "observing" && status !== "paused" && status !== "private") throw new Error("Invalid observation status.");
@@ -105,16 +110,27 @@ async function bootstrap(): Promise<void> {
     const assistance = input.assistance_level;
     if (outcome !== "achieved" && outcome !== "partially_achieved" && outcome !== "blocked") throw new Error("Invalid checkpoint outcome.");
     if (!["A0", "A1", "A2", "A3", "A4", "A5"].includes(String(assistance))) throw new Error("Invalid assistance level.");
-    return controller.completeCheckpoint({ checkpoint_id: text(input.checkpoint_id, "Checkpoint identifier", 100), outcome, result: text(input.result, "Result", 2000), validation: text(input.validation, "Validation", 2000), assistance_level: assistance as "A0" | "A1" | "A2" | "A3" | "A4" | "A5" });
+    const source = input.evidence_source ?? "self_reported";
+    if (!EVIDENCE_SOURCES.includes(source as never) || source === "observed" || source === "reviewed") throw new Error("Invalid evidence source.");
+    return controller.completeCheckpoint({ checkpoint_id: text(input.checkpoint_id, "Checkpoint identifier", 100), outcome, result: text(input.result, "Result", 2000), validation: text(input.validation, "Validation", 2000), assistance_level: assistance as "A0" | "A1" | "A2" | "A3" | "A4" | "A5", evidence_source: source as "self_reported" | "tool_verified" | "artifact_verified" });
   });
+  ipcMain.handle("v03:checkpoint:transition", (_event, value: unknown) => { const input = payload(value, "checkpoint transition"); const status = input.status; if (!CHECKPOINT_STATUSES.includes(status as never) || status === "pending" || status === "completed") throw new Error("Invalid checkpoint transition."); return controller.transitionCheckpoint({ checkpoint_id: text(input.checkpoint_id, "Checkpoint identifier", 100), status: status as "active" | "blocked" | "deferred" | "abandoned", reason: text(input.reason, "Checkpoint reason", 1000) }); });
   ipcMain.handle("v03:day:end", (_event, value: unknown) => {
     const input = payload(value, "end day");
     if (!DAY_OUTCOMES.includes(input.outcome as never)) throw new Error("Invalid day outcome.");
-    return controller.endDay({ outcome: input.outcome as (typeof DAY_OUTCOMES)[number], output_summary: text(input.output_summary, "Output summary", 3000), validation_summary: text(input.validation_summary, "Validation summary", 3000), lesson: text(input.lesson, "Lesson", 2000) });
+    const source = input.evidence_source ?? "self_reported";
+    if (source !== "self_reported" && source !== "tool_verified" && source !== "artifact_verified") throw new Error("Invalid evidence source.");
+    return controller.endDay({ outcome: input.outcome as (typeof DAY_OUTCOMES)[number], output_summary: text(input.output_summary, "Output summary", 3000), validation_summary: text(input.validation_summary, "Validation summary", 3000), lesson: text(input.lesson, "Lesson", 2000), evidence_source: source });
   });
   ipcMain.handle("v03:memory:status", (_event, value: unknown) => { const input = payload(value, "memory status"); const status = input.status; if (status !== "active" && status !== "pending_confirmation") throw new Error("Invalid memory status."); return controller.setMemoryStatus(text(input.memory_id, "Memory identifier", 100), status); });
   ipcMain.handle("v03:memory:pin", (_event, value: unknown) => { const input = payload(value, "memory pin"); if (typeof input.pinned !== "boolean") throw new Error("Invalid pinned value."); return controller.setMemoryPinned(text(input.memory_id, "Memory identifier", 100), input.pinned); });
   ipcMain.handle("v03:memory:delete", (_event, value: unknown) => controller.deleteMemory(text(payload(value, "memory delete").memory_id, "Memory identifier", 100)));
+  ipcMain.handle("v03:evidence:review", (_event, value: unknown) => controller.reviewEvidence(text(payload(value, "evidence review").evidence_id, "Evidence identifier", 100)));
+  ipcMain.handle("v03:memory:delete-day", (_event, value: unknown) => controller.deleteMemoriesByDay(text(payload(value, "day memory delete").day_id, "Day identifier", 100)));
+  ipcMain.handle("v03:memory:delete-session", (_event, value: unknown) => controller.deleteMemoriesBySession(text(payload(value, "session memory delete").session_id, "Session identifier", 100)));
+  ipcMain.handle("v03:retention", (_event, value: unknown) => { const input = payload(value, "retention"); const memoryDays = input.memory_days === null ? null : Number(input.memory_days); return controller.setRetentionPolicy(memoryDays, Number(input.sensitive_days)); });
+  ipcMain.handle("v03:feedback", (_event, value: unknown) => { const input = payload(value, "feedback"); if (!INTERVENTION_FEEDBACK_KINDS.includes(input.kind as never)) throw new Error("Invalid feedback kind."); return controller.addInterventionFeedback(text(input.request_id, "Request identifier", 100), input.kind as (typeof INTERVENTION_FEEDBACK_KINDS)[number], typeof input.note === "string" ? input.note.slice(0, 1000) : undefined); });
+  ipcMain.handle("v03:backup", () => controller.createBackup(path.join(app.getPath("documents"), "Kovacs Backups")));
   ipcMain.handle("v03:close", async () => {
     const state = controller.getAmbientState();
     if (state && state.status !== "ended" && state.status !== "paused") await controller.setStatus("paused");
@@ -128,7 +144,12 @@ async function bootstrap(): Promise<void> {
   });
 }
 
-app.whenReady().then(bootstrap).catch((error: unknown) => { console.error(`Kovacs pet failed: ${(error as Error).message}`); app.quit(); });
+app.whenReady().then(bootstrap).catch((error: unknown) => {
+  const message = (error as Error).message;
+  console.error(`Kovacs pet failed: ${message}`);
+  dialog.showErrorBox("Kovacs could not start safely", `${message}\n\nNo database was deleted or rebuilt. Restore a user-created backup or run npm run v031:validate before retrying.`);
+  app.quit();
+});
 app.on("second-instance", () => { pet?.show(); pet?.focus(); });
 app.on("before-quit", () => { if (interval) clearInterval(interval); globalShortcut.unregisterAll(); store?.close(); });
 app.on("window-all-closed", () => app.quit());
