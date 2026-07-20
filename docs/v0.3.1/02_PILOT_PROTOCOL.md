@@ -51,11 +51,11 @@ Pause the pilot and open a defect if:
 
 ## Exit criteria
 
-The pilot is sufficient to specify V0.4 when:
+The pilot is sufficient to specify the V0.3.2 Context Foundation when:
 
 - at least five complete days exist;
 - restart has been exercised at least twice;
 - at least twenty interventions have feedback or the system correctly remained mostly silent;
 - all durable data has been inspected once;
 - failure and false-positive patterns are grouped into a written taxonomy;
-- the V0.4 Context Engine requirements are derived from observed gaps rather than imagined modes.
+- the V0.3.2 context, perception, and retrieval requirements are derived from observed gaps rather than imagined modes.

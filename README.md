@@ -22,7 +22,7 @@ The main goal is fixed and visible:
 - Retention controls, per-day/session deletion, JSON export, and consistent SQLite backup are local and user-triggered.
 - Kovacs advises and drafts only. It cannot click, type, send, submit, publish, commit, or perform post-session actions.
 
-Meeting Mode, Google Meet captions, Career Mode, direct OpenAI API integration, and autonomous computer actions are reserved for later versions.
+Meeting Mode, Google Meet captions, Career Mode, and autonomous computer actions are reserved for later versions. Direct OpenAI API integration is intentionally not planned; Codex CLI remains the model gateway.
 
 ## Install and verify
 
@@ -115,6 +115,7 @@ npm run dev -- coach ses_... "Help me choose the next diagnostic step" A2
 - V0.3.1 hardening charter: `docs/v0.3.1/00_HARDENING_CHARTER.md`
 - migration and recovery: `docs/v0.3.1/01_MIGRATION_AND_RECOVERY.md`
 - 5-10 day pilot protocol: `docs/v0.3.1/02_PILOT_PROTOCOL.md`
+- V0.3.2 Context Foundation charter: `docs/v0.3.2/00_CONTEXT_FOUNDATION_CHARTER.md`
 - contracts: `contracts/v0.3/`
 - runtime: `src/v03/`
 - pet renderer: `ui/v0.3/`
