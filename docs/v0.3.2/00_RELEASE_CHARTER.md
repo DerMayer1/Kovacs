@@ -7,7 +7,7 @@ V0.3.2 makes Kovacs easier to brief and better at understanding work context wit
 - One-input initial calibration with sourced interpretations, confidence, assumptions, and at most two consequential questions.
 - One-input daily intent transformed into an objective, evidence criteria, and bounded checkpoints.
 - One-input End Day transformed into a conservative evidence proposal before the day can close.
-- Windows accessibility and OCR adapters invoked locally on an already-authorized capture.
+- A least-invasive perception cascade: Windows accessibility first, local OCR only after insufficient UIA, and a Codex screenshot only after both local stages remain insufficient.
 - A compact context engine that persists categories, confidence, ambiguity, changed fields, and a digest—never raw OCR, accessibility text, screenshots, or window titles.
 - Deterministic local vector memory and hybrid retrieval with provenance.
 - Additive SQLite migration, recovery, retention, backup, and deletion behavior.
