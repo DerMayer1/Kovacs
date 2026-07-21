@@ -216,6 +216,20 @@ function renderMemories() {
   });
 }
 
+function renderContextDiagnostics() {
+  const container = $("#context-decisions"); clear(container);
+  const decisions = operating.context_diagnostics || [];
+  if (!decisions.length) { container.append(node("p", "empty-copy", "No context decisions have been recorded yet.")); return; }
+  decisions.forEach((decision) => {
+    const card = node("article", `context-decision ${decision.decision}`), meta = node("div", "memory-meta");
+    meta.append(node("span", "", `${decision.decision.toUpperCase()} · ${labelize(decision.reason)}`), node("b", "", `${Math.round(decision.confidence * 100)}%`));
+    const path = decision.perception_path.replaceAll("_", " → ").toUpperCase();
+    const delta = decision.changed_fields.length ? decision.changed_fields.map(labelize).join(" · ") : "No semantic delta";
+    card.append(meta, node("p", "", `${decision.application} · ${path}`), node("small", "", `${delta}${decision.image_attached ? " · image attached" : " · no image"}`));
+    container.append(card);
+  });
+}
+
 function render(message) {
   renderMode(message);
   renderRecovery();
@@ -223,9 +237,9 @@ function render(message) {
   $("#setup-view").classList.toggle("hidden", configured);
   $("#tabs").classList.toggle("hidden", !configured);
   if (!configured) { renderSetup(); return; }
-  ["today", "growth", "memory"].forEach((name) => $("#" + name + "-view").classList.toggle("hidden", currentTab !== name));
+  ["today", "growth", "memory", "context"].forEach((name) => $("#" + name + "-view").classList.toggle("hidden", currentTab !== name));
   document.querySelectorAll("#tabs button").forEach((button) => button.classList.toggle("active", button.dataset.tab === currentTab));
-  renderHierarchy(); renderWeekProposal(); renderDayProposal(); renderActiveDay(); renderEndDayProposal(); renderCompetencies(); renderEvidence(); renderMemories();
+  renderHierarchy(); renderWeekProposal(); renderDayProposal(); renderActiveDay(); renderEndDayProposal(); renderCompetencies(); renderEvidence(); renderMemories(); renderContextDiagnostics();
 }
 
 window.kovacs.bootstrap().then((data) => { ambient = data.ambient; operating = data.operating; defaultProject = data.defaultProject; $("#project").value = operating.active_day?.project || defaultProject; $("#memory-days").value = operating.retention.memory_retention_days ?? ""; $("#sensitive-days").value = operating.retention.sensitive_memory_retention_days; render(); }).catch(showError);
