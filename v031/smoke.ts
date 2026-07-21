@@ -20,7 +20,7 @@ try {
   store.addInterventionFeedback("req_v031_smoke", "useful", null);
   const ended = store.endDay({ outcome: "partially_achieved", output_summary: "Hardening smoke complete", validation_summary: "Assertions passed", lesson: "Keep recovery explicit", evidence_source: "tool_verified" });
   const backup = await store.createBackup(path.join(temporary, "backup")); await access(backup.database); await access(backup.export);
-  const checks = { schema: store.snapshot().recovery.schema_version_applied === "0.3.1", tool_evidence: store.snapshot().competencies.some((item) => item.evidence_count > 0), deterministic_end: ended.deterministic_summary?.deferred_checkpoints === 1, telemetry: store.snapshot().usage_today.response_characters === 50, feedback: store.snapshot().recent_feedback.length === 1, backup: true, no_window_titles: store.snapshot().retention.persist_window_titles === false };
+  const checks = { schema: ["0.3.1", "0.3.2"].includes(store.snapshot().recovery.schema_version_applied), tool_evidence: store.snapshot().competencies.some((item) => item.evidence_count > 0), deterministic_end: ended.deterministic_summary?.deferred_checkpoints === 1, telemetry: store.snapshot().usage_today.response_characters === 50, feedback: store.snapshot().recent_feedback.length === 1, backup: true, no_window_titles: store.snapshot().retention.persist_window_titles === false };
   console.log(JSON.stringify({ checks, usage: store.snapshot().usage_today, summary: ended.deterministic_summary }, null, 2));
   if (Object.values(checks).some((value) => !value)) process.exitCode = 1;
 } finally { store?.close(); await rm(temporary, { recursive: true, force: true }); }

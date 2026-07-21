@@ -3,10 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AssistanceLevel, MemoryCandidate } from "../v01/types.js";
+import { cosineSimilarity, embedLocally, lexicalSimilarity, vectorSourceHash } from "../v032/memory.js";
 import type { V03Contracts } from "./contracts.js";
 import {
   COMPETENCIES,
   type Checkpoint,
+  type CalibrationInput,
   type CheckpointCompletionInput,
   type CheckpointStatus,
   type CheckpointTransitionInput,
@@ -18,11 +20,14 @@ import {
   type DayProposal,
   type DaySummary,
   type EndDayInput,
+  type EndDayDraft,
+  type EndDayProposal,
   type EvidenceRecord,
   type EvidenceSource,
   type InterventionFeedback,
   type InterventionFeedbackKind,
   type MemoryRecord,
+  type MemoryRetrievalResult,
   type OperatingProfile,
   type OperatingSnapshot,
   type PendingDraft,
@@ -33,9 +38,10 @@ import {
   type UsageSummary,
   type WeekInput,
   type WeekProposal,
+  type ContextFrame,
 } from "./types.js";
 
-const identifier = (prefix: "draft" | "day" | "cp" | "ev" | "mem" | "inv" | "fb" | "audit") => `${prefix}_${randomUUID().replaceAll("-", "")}`;
+const identifier = (prefix: "draft" | "day" | "cp" | "ev" | "mem" | "inv" | "fb" | "audit" | "ctx") => `${prefix}_${randomUUID().replaceAll("-", "")}`;
 const now = (): string => new Date().toISOString();
 const json = <T>(value: string): T => JSON.parse(value) as T;
 
@@ -45,6 +51,9 @@ interface DayRow { day_id: string; ambient_day_id: string; project: string; orig
 interface CheckpointRow { checkpoint_id: string; day_id: string; position: number; title: string; evidence_required: string; competency: Competency; status: "pending" | "active" | "completed" | "skipped"; lifecycle_status: CheckpointStatus | null; status_reason: string | null; completed_at: string | null; }
 interface EvidenceRow { evidence_id: string; day_id: string; checkpoint_id: string | null; project: string; competency: Competency; source: EvidenceRecord["source"]; assistance_level: AssistanceLevel; outcome: DayOutcome; confidence: number; summary: string; validation: string | null; source_event_id: string | null; created_at: string; }
 interface MemoryRow { memory_id: string; kind: MemoryRecord["kind"]; claim: string; source: MemoryRecord["source"]; confidence: number; sensitivity: MemoryRecord["sensitivity"]; status: MemoryRecord["status"]; pinned: number; created_at: string; updated_at: string; origin_day_id: string | null; origin_session_id: string | null; }
+interface EndDayDraftRow { draft_id: string; day_id: string; created_at: string; narrative: string; proposal_json: string; }
+interface MemoryVectorRow { memory_id: string; dimensions: number; vector_json: string; source_hash: string; created_at: string; }
+interface ContextFrameRow { context_id: string; occurred_at: string; application: string; project: string | null; activity: string; artifact: string | null; visible_intent: string; active_checkpoint: string | null; privacy_classification: ContextFrame["privacy_classification"]; confidence: number; ambiguity_json: string; signal_sources_json: string; changed_fields_json: string; text_digest: string | null; }
 
 export interface InvocationInput {
   day_id: string | null;
@@ -65,7 +74,7 @@ export class V03Store {
   private recovery: RecoveryStatus;
 
   private constructor(private readonly db: DatabaseSync, private readonly contracts: V03Contracts, private readonly databasePath: string) {
-    this.recovery = { schema_version: "0.3.1", database_integrity: "ok", schema_version_applied: "0.3.1", resumed_day_id: null, pending_draft_kind: null, interrupted_invocations: 0, observation_requires_manual_resume: false };
+    this.recovery = { schema_version: "0.3.2", database_integrity: "ok", schema_version_applied: "0.3.2", resumed_day_id: null, pending_draft_kind: null, interrupted_invocations: 0, observation_requires_manual_resume: false };
   }
 
   static async create(databasePath: string, contracts: V03Contracts): Promise<V03Store> {
@@ -144,6 +153,22 @@ export class V03Store {
         audit_id TEXT PRIMARY KEY, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
         event TEXT NOT NULL, reason TEXT, metadata_json TEXT, created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS end_day_drafts (
+        draft_id TEXT PRIMARY KEY, day_id TEXT NOT NULL REFERENCES day_plans(day_id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL, narrative TEXT NOT NULL, proposal_json TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS memory_vectors (
+        memory_id TEXT PRIMARY KEY REFERENCES memories(memory_id) ON DELETE CASCADE,
+        dimensions INTEGER NOT NULL, vector_json TEXT NOT NULL, source_hash TEXT NOT NULL, created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS context_frames (
+        context_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, application TEXT NOT NULL,
+        project TEXT, activity TEXT NOT NULL, artifact TEXT, visible_intent TEXT NOT NULL,
+        active_checkpoint TEXT, privacy_classification TEXT NOT NULL, confidence REAL NOT NULL,
+        ambiguity_json TEXT NOT NULL, signal_sources_json TEXT NOT NULL,
+        changed_fields_json TEXT NOT NULL, text_digest TEXT
+      );
+      CREATE INDEX IF NOT EXISTS context_frames_time ON context_frames(occurred_at DESC);
     `);
     this.ensureColumn("day_plans", "revision", "INTEGER NOT NULL DEFAULT 1");
     this.ensureColumn("day_plans", "summary_json", "TEXT");
@@ -161,10 +186,12 @@ export class V03Store {
     this.db.prepare("UPDATE evidence SET source='self_reported' WHERE source IN ('user_reported','validated')").run();
     this.db.prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES ('0.3.0', ?)").run(now());
     this.db.prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES ('0.3.1', ?)").run(now());
-    this.db.prepare("INSERT OR REPLACE INTO v03_meta(key, value) VALUES ('schema_version', '0.3.1')").run();
+    this.db.prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES ('0.3.2', ?)").run(now());
+    this.db.prepare("INSERT OR REPLACE INTO v03_meta(key, value) VALUES ('schema_version', '0.3.2')").run();
     const insert = this.db.prepare("INSERT OR IGNORE INTO competencies(competency, level, confidence, evidence_count, last_evidence_at) VALUES (?, 'unverified', 0, 0, NULL)");
     for (const competency of COMPETENCIES) insert.run(competency);
     for (const competency of COMPETENCIES) this.recalculateCompetency(competency);
+    this.backfillMemoryVectors();
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
@@ -179,14 +206,15 @@ export class V03Store {
     const day = this.getActiveDay();
     const pending = this.setupDraft() ?? this.weekDraft() ?? this.dayDraft();
     this.recovery = {
-      schema_version: "0.3.1", database_integrity: "ok", schema_version_applied: "0.3.1",
+      schema_version: "0.3.2", database_integrity: "ok", schema_version_applied: "0.3.2",
       resumed_day_id: day?.day_id ?? null, pending_draft_kind: pending?.kind ?? null,
       interrupted_invocations: Number(interrupted), observation_requires_manual_resume: Boolean(day),
     };
   }
 
-  saveSetupDraft(input: SetupInput, proposal: SetupProposal): PendingDraft<SetupProposal> {
-    this.contracts.validateSetupProposal(proposal);
+  saveSetupDraft(input: SetupInput | CalibrationInput, proposal: SetupProposal): PendingDraft<SetupProposal> {
+    if (proposal.interpreted_profile) this.contracts.validateCalibrationProposal(proposal);
+    else this.contracts.validateSetupProposal(proposal);
     const draft: PendingDraft<SetupProposal> = { draft_id: identifier("draft"), kind: "setup", created_at: now(), project: null, original_objective: null, input, proposal };
     this.db.prepare("DELETE FROM pending_drafts WHERE kind = 'setup'").run();
     this.db.prepare("INSERT INTO pending_drafts VALUES (?, 'setup', ?, NULL, NULL, ?, ?)").run(draft.draft_id, draft.created_at, JSON.stringify(input), JSON.stringify(proposal));
@@ -215,8 +243,9 @@ export class V03Store {
 
   private setupDraft(row = this.draftRow("setup")): PendingDraft<SetupProposal> | null {
     if (!row) return null;
-    const proposal = json<SetupProposal>(row.proposal_json); this.contracts.validateSetupProposal(proposal);
-    return { draft_id: row.draft_id, kind: "setup", created_at: row.created_at, project: null, original_objective: null, input: json<SetupInput>(row.input_json ?? "null"), proposal };
+    const proposal = json<SetupProposal>(row.proposal_json);
+    if (proposal.interpreted_profile) this.contracts.validateCalibrationProposal(proposal); else this.contracts.validateSetupProposal(proposal);
+    return { draft_id: row.draft_id, kind: "setup", created_at: row.created_at, project: null, original_objective: null, input: json<SetupInput | CalibrationInput>(row.input_json ?? "null"), proposal };
   }
 
   private dayDraft(row = this.draftRow("day")): PendingDraft<DayProposal> | null {
@@ -234,7 +263,8 @@ export class V03Store {
   confirmSetup(draftId: string, mainGoal: string): OperatingProfile {
     const draft = this.setupDraft(this.db.prepare("SELECT * FROM pending_drafts WHERE draft_id = ? AND kind = 'setup'").get(draftId) as DraftRow | undefined);
     if (!draft || !draft.input) throw new Error("The setup proposal no longer exists.");
-    const setupInput = draft.input as SetupInput;
+    const setupInput = draft.input as SetupInput | CalibrationInput;
+    const interpreted = draft.proposal.interpreted_profile;
     const at = now(); const target = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -242,10 +272,14 @@ export class V03Store {
         .run(mainGoal, draft.proposal.mission_title, JSON.stringify(draft.proposal.mission_success_criteria), at, target,
           draft.proposal.weekly_outcome, JSON.stringify(draft.proposal.weekly_success_criteria), JSON.stringify(draft.proposal.weekly_competencies), at, at, at);
       this.upsertMemory("main_goal", mainGoal, "user_stated", 1, "internal", "active", true, at);
-      this.upsertMemory("routine", `Available deliberate-practice time: ${setupInput.available_hours_per_week} hours per week.`, "user_stated", 1, "internal", "active", false, at);
-      this.upsertMemory("context", `Current position: ${setupInput.current_position}`, "user_stated", 1, "internal", "active", false, at);
-      this.upsertMemory("context", `Active projects: ${setupInput.active_projects}`, "user_stated", 1, "internal", "active", false, at);
-      this.upsertMemory("context", `Self-identified growth edges: ${setupInput.weaknesses}`, "user_stated", 1, "sensitive", "active", false, at);
+      const hours = interpreted?.available_hours_per_week.value ?? ("available_hours_per_week" in setupInput ? setupInput.available_hours_per_week : null);
+      const position = interpreted?.current_position.value ?? ("current_position" in setupInput ? setupInput.current_position : null);
+      const projects = interpreted?.active_projects.value ?? ("active_projects" in setupInput ? [setupInput.active_projects] : null);
+      const edges = interpreted?.growth_edges.value ?? ("weaknesses" in setupInput ? [setupInput.weaknesses] : null);
+      if (hours !== null) this.upsertMemory("routine", `Available deliberate-practice time: ${hours} hours per week.`, "user_stated", interpreted?.available_hours_per_week.confidence ?? 1, "internal", "active", false, at);
+      if (position) this.upsertMemory("context", `Current position: ${position}`, "user_stated", interpreted?.current_position.confidence ?? 1, "internal", "active", false, at);
+      if (projects?.length) this.upsertMemory("context", `Active projects: ${projects.join("; ")}`, "user_stated", interpreted?.active_projects.confidence ?? 1, "internal", "active", false, at);
+      if (edges?.length) this.upsertMemory("context", `Self-identified growth edges: ${edges.join("; ")}`, "user_stated", interpreted?.growth_edges.confidence ?? 1, "sensitive", "active", false, at);
       this.audit("setup", draftId, "setup_confirmed", "Explicit user confirmation", { mission: draft.proposal.mission_title, week: draft.proposal.weekly_outcome });
       this.db.prepare("DELETE FROM pending_drafts WHERE draft_id = ?").run(draftId);
       this.db.exec("COMMIT");
@@ -496,10 +530,62 @@ export class V03Store {
       this.insertEvidence(evidence);
       this.recalculateCompetency("execution_ownership");
       this.upsertMemory("lesson", input.lesson.trim(), "user_stated", 0.9, "internal", "active", false, at);
+      this.db.prepare("DELETE FROM end_day_drafts WHERE day_id=?").run(day.day_id);
       this.audit("day", day.day_id, "day_ended", "Explicit End Day", summary);
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     return this.getDay(day.day_id)!;
+  }
+
+  saveEndDayDraft(dayId: string, narrative: string, proposal: EndDayProposal): EndDayDraft {
+    this.contracts.validateEndDayProposal(proposal);
+    const day = this.getActiveDay();
+    if (!day || day.day_id !== dayId) throw new Error("The active day changed before End Day could be drafted.");
+    const draft: EndDayDraft = { draft_id: identifier("draft"), day_id: dayId, created_at: now(), narrative: narrative.trim(), proposal };
+    this.db.prepare("DELETE FROM end_day_drafts WHERE day_id=?").run(dayId);
+    this.db.prepare("INSERT INTO end_day_drafts VALUES (?, ?, ?, ?, ?)")
+      .run(draft.draft_id, draft.day_id, draft.created_at, draft.narrative, JSON.stringify(draft.proposal));
+    this.audit("end_day_draft", draft.draft_id, "end_day_proposed", "Codex interpretation awaiting confirmation", { day_id: dayId });
+    return draft;
+  }
+
+  getEndDayDraft(): EndDayDraft | null {
+    const day = this.getActiveDay();
+    if (!day) return null;
+    const row = this.db.prepare("SELECT * FROM end_day_drafts WHERE day_id=? ORDER BY created_at DESC LIMIT 1").get(day.day_id) as EndDayDraftRow | undefined;
+    if (!row) return null;
+    const proposal = json<EndDayProposal>(row.proposal_json);
+    this.contracts.validateEndDayProposal(proposal);
+    return { draft_id: row.draft_id, day_id: row.day_id, created_at: row.created_at, narrative: row.narrative, proposal };
+  }
+
+  rejectEndDayDraft(draftId: string, reason: string): void {
+    const result = this.db.prepare("DELETE FROM end_day_drafts WHERE draft_id=?").run(draftId);
+    if (result.changes !== 1) throw new Error("The End Day proposal no longer exists.");
+    this.audit("end_day_draft", draftId, "end_day_rejected", reason);
+  }
+
+  recordContextFrame(frame: ContextFrame): ContextFrame {
+    this.contracts.validateContextFrame(frame);
+    this.db.prepare(`INSERT OR REPLACE INTO context_frames
+      (context_id, occurred_at, application, project, activity, artifact, visible_intent, active_checkpoint,
+       privacy_classification, confidence, ambiguity_json, signal_sources_json, changed_fields_json, text_digest)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(frame.context_id, frame.occurred_at, frame.application, frame.project, frame.activity, frame.artifact,
+        frame.visible_intent, frame.active_checkpoint, frame.privacy_classification, frame.confidence,
+        JSON.stringify(frame.ambiguity), JSON.stringify(frame.signal_sources), JSON.stringify(frame.changed_fields), frame.text_digest);
+    return frame;
+  }
+
+  listContextFrames(limit = 25): ContextFrame[] {
+    const rows = this.db.prepare("SELECT * FROM context_frames ORDER BY occurred_at DESC LIMIT ?")
+      .all(Math.max(1, Math.min(100, limit))) as unknown as ContextFrameRow[];
+    return rows.map((row) => ({ schema_version: "0.3.2", context_id: row.context_id, occurred_at: row.occurred_at,
+      application: row.application, project: row.project, activity: row.activity, artifact: row.artifact,
+      visible_intent: row.visible_intent, active_checkpoint: row.active_checkpoint,
+      privacy_classification: row.privacy_classification, confidence: row.confidence,
+      ambiguity: json<string[]>(row.ambiguity_json), signal_sources: json<ContextFrame["signal_sources"]>(row.signal_sources_json),
+      changed_fields: json<string[]>(row.changed_fields_json), text_digest: row.text_digest }));
   }
 
   previewDaySummary(input: EndDayInput): DaySummary {
@@ -544,7 +630,42 @@ export class V03Store {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
       ON CONFLICT(kind, claim) DO UPDATE SET source=excluded.source, confidence=excluded.confidence, sensitivity=excluded.sensitivity, status=excluded.status, pinned=MAX(memories.pinned, excluded.pinned), updated_at=excluded.updated_at`)
       .run(memory.memory_id, memory.kind, memory.claim, memory.source, memory.confidence, memory.sensitivity, memory.status, memory.pinned ? 1 : 0, memory.created_at, memory.updated_at);
+    this.upsertMemoryVector(memory.memory_id, memory.claim, at);
     return memory;
+  }
+
+  private upsertMemoryVector(memoryId: string, claim: string, at = now()): void {
+    const vector = embedLocally(claim);
+    this.db.prepare(`INSERT INTO memory_vectors(memory_id, dimensions, vector_json, source_hash, created_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(memory_id) DO UPDATE SET dimensions=excluded.dimensions, vector_json=excluded.vector_json,
+      source_hash=excluded.source_hash, created_at=excluded.created_at`)
+      .run(memoryId, vector.length, JSON.stringify(vector), vectorSourceHash(claim), at);
+  }
+
+  private backfillMemoryVectors(): void {
+    const missing = this.db.prepare(`SELECT m.memory_id, m.claim, m.updated_at FROM memories m
+      LEFT JOIN memory_vectors v ON v.memory_id=m.memory_id WHERE v.memory_id IS NULL`).all() as unknown as Array<{ memory_id: string; claim: string; updated_at: string }>;
+    for (const row of missing) this.upsertMemoryVector(row.memory_id, row.claim, row.updated_at);
+  }
+
+  searchMemories(query: string, limit = 5): MemoryRetrievalResult[] {
+    const normalized = query.trim();
+    if (!normalized) return [];
+    const queryVector = embedLocally(normalized);
+    const rows = this.db.prepare(`SELECT m.*, v.dimensions, v.vector_json, v.source_hash, v.created_at vector_created_at
+      FROM memories m JOIN memory_vectors v ON v.memory_id=m.memory_id
+      WHERE m.status='active' ORDER BY m.pinned DESC, m.updated_at DESC`).all() as unknown as Array<MemoryRow & MemoryVectorRow & { vector_created_at: string }>;
+    return rows.map((row) => {
+      const memory: MemoryRecord = { schema_version: "0.3.0", memory_id: row.memory_id, kind: row.kind, claim: row.claim,
+        source: row.source, confidence: row.confidence, sensitivity: row.sensitivity, status: row.status,
+        pinned: Boolean(row.pinned), created_at: row.created_at, updated_at: row.updated_at };
+      const lexical = lexicalSimilarity(normalized, row.claim);
+      const vector = cosineSimilarity(queryVector, json<number[]>(row.vector_json));
+      const score = (0.35 * lexical) + (0.55 * Math.max(0, vector)) + (0.1 * row.confidence) + (row.pinned ? 0.05 : 0);
+      return { memory, score, lexical_score: lexical, vector_score: vector,
+        provenance: `local-hybrid:${row.source}:${row.source_hash.slice(0, 12)}` };
+    }).sort((a, b) => b.score - a.score).slice(0, Math.max(1, Math.min(20, limit)));
   }
 
   ingestMemoryCandidates(candidates: MemoryCandidate[], originDayId: string | null = null, originSessionId: string | null = null): void {
@@ -689,8 +810,10 @@ export class V03Store {
     this.db.exec("PRAGMA wal_checkpoint(FULL)");
     this.db.exec(`VACUUM INTO '${database.replaceAll("'", "''")}'`);
     const payload = {
-      schema_version: "0.3.1", exported_at: now(), source_database: path.basename(this.databasePath),
+      schema_version: "0.3.2", exported_at: now(), source_database: path.basename(this.databasePath),
       profile: this.getProfile(), days: this.listDays(), evidence: this.listEvidence(), competencies: this.listCompetencies(), memories: this.listMemories(),
+      context_frames: this.listContextFrames(100),
+      memory_index: this.db.prepare("SELECT memory_id, dimensions, source_hash, created_at FROM memory_vectors ORDER BY created_at DESC").all(),
       usage_today: this.usageToday(), retention: this.retentionPolicy(), recent_feedback: this.listInterventionFeedback(100),
       lifecycle_audit: this.db.prepare("SELECT * FROM lifecycle_audit ORDER BY created_at DESC").all(),
       invocation_metrics: this.db.prepare(`SELECT invocation_id, day_id, reason, urgency, duration_ms, prompt_characters,
@@ -714,6 +837,7 @@ export class V03Store {
   snapshot(): OperatingSnapshot {
     return {
       profile: this.getProfile(), active_day: this.getActiveDay(), pending_setup: this.setupDraft(), pending_week: this.weekDraft(), pending_day: this.dayDraft(),
+      pending_end_day: this.getEndDayDraft(), recent_context: this.listContextFrames(),
       competencies: this.listCompetencies(), recent_evidence: this.listEvidence().slice(0, 50), memories: this.listMemories(), usage_today: this.usageToday(),
       recovery: this.recovery, retention: this.retentionPolicy(), recent_feedback: this.listInterventionFeedback(),
     };

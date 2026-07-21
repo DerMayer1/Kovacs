@@ -13,7 +13,7 @@ const sources = await Promise.all([
   "src/v03/store.ts", "src/v03/controller.ts", "src/v03/types.ts", "src/v02/controller.ts", "src/v03/electron/main.ts", "ui/v0.3/preload.cjs", "ui/v0.3/renderer.js", "test/v03/hardening.test.ts", "README.md",
 ].map((file) => readFile(path.join(root, file), "utf8")));
 const store = sources[0]!, controller = sources[1]!, types = sources[2]!, ambient = sources[3]!, electron = sources[4]!, preload = sources[5]!, renderer = sources[6]!, tests = sources[7]!, readme = sources[8]!;
-record("H02", store.includes("ensureColumn") && store.includes("schema_version', '0.3.1") && tests.includes("recover"), "additive schema migration and restart recovery are implemented");
+record("H02", store.includes("ensureColumn") && (store.includes("schema_version', '0.3.1") || store.includes("schema_version', '0.3.2")) && tests.includes("recover"), "additive schema migration and restart recovery are implemented");
 record("H03", store.includes("status='interrupted'") && store.includes("beginInvocation") && store.includes("finishInvocation"), "in-flight Codex calls fail closed after restart");
 record("H04", ["self_reported", "observed", "tool_verified", "artifact_verified", "reviewed"].every((term) => types.includes(term)) && !store.includes('source: input.outcome === "achieved"'), "evidence provenance is explicit and never inferred from a text field");
 record("H05", ambient.includes("window_title: null") && readme.includes("window titles") && tests.includes("window_title"), "window titles and raw capture remain non-durable");

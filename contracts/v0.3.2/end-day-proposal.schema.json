@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kovacs.local/contracts/v0.3.2/end-day-proposal.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "narrative_summary", "outcome", "output_summary", "validation_summary", "evidence_source", "lesson", "missing_proof", "carry_forward", "assumptions"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "0.3.2" },
+    "narrative_summary": { "type": "string", "minLength": 4, "maxLength": 2000 },
+    "outcome": { "type": "string", "enum": ["achieved", "partially_achieved", "blocked", "misdirected"] },
+    "output_summary": { "type": "string", "minLength": 1, "maxLength": 3000 },
+    "validation_summary": { "type": "string", "minLength": 1, "maxLength": 3000 },
+    "evidence_source": { "type": "string", "enum": ["self_reported", "tool_verified", "artifact_verified"] },
+    "lesson": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "missing_proof": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+    "carry_forward": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+    "assumptions": { "type": "array", "maxItems": 8, "items": { "type": "string" } }
+  }
+}

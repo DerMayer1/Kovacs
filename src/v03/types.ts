@@ -27,6 +27,18 @@ export type EvidenceSource = (typeof EVIDENCE_SOURCES)[number];
 export type CheckpointStatus = (typeof CHECKPOINT_STATUSES)[number];
 export type InterventionFeedbackKind = (typeof INTERVENTION_FEEDBACK_KINDS)[number];
 export type MemoryStatus = "active" | "pending_confirmation";
+export type InterpretationSource = "explicit" | "inferred" | "unknown" | "confirmed";
+
+export interface InterpretedValue<T> {
+  value: T | null;
+  source: InterpretationSource;
+  confidence: number;
+  rationale: string;
+}
+
+export interface CalibrationInput {
+  narrative: string;
+}
 
 export interface SetupInput {
   current_position: string;
@@ -45,6 +57,15 @@ export interface SetupProposal {
   weekly_competencies: Competency[];
   rationale: string;
   warnings: string[];
+  interpreted_profile?: {
+    current_position: InterpretedValue<string>;
+    available_hours_per_week: InterpretedValue<number>;
+    active_projects: InterpretedValue<string[]>;
+    growth_edges: InterpretedValue<string[]>;
+    desired_outcome: InterpretedValue<string>;
+  };
+  assumptions?: string[];
+  clarification_questions?: string[];
 }
 
 export interface WeekInput {
@@ -81,7 +102,7 @@ export interface PendingDraft<T extends SetupProposal | WeekProposal | DayPropos
   created_at: string;
   project: string | null;
   original_objective: string | null;
-  input: SetupInput | WeekInput | null;
+  input: SetupInput | CalibrationInput | WeekInput | null;
   proposal: T;
 }
 
@@ -206,9 +227,9 @@ export interface UsageSummary {
 }
 
 export interface RecoveryStatus {
-  schema_version: "0.3.1";
+  schema_version: "0.3.2";
   database_integrity: "ok";
-  schema_version_applied: "0.3.1";
+  schema_version_applied: "0.3.2";
   resumed_day_id: string | null;
   pending_draft_kind: "setup" | "week" | "day" | null;
   interrupted_invocations: number;
@@ -245,6 +266,8 @@ export interface OperatingSnapshot {
   recovery: RecoveryStatus;
   retention: RetentionPolicy;
   recent_feedback: InterventionFeedback[];
+  pending_end_day: EndDayDraft | null;
+  recent_context: ContextFrame[];
 }
 
 export interface V03Update {
@@ -282,6 +305,48 @@ export interface EndDayInput {
   evidence_source?: Extract<EvidenceSource, "self_reported" | "tool_verified" | "artifact_verified">;
 }
 
+export interface EndDayProposal extends EndDayInput {
+  schema_version: "0.3.2";
+  narrative_summary: string;
+  missing_proof: string[];
+  carry_forward: string[];
+  assumptions: string[];
+}
+
+export interface EndDayDraft {
+  draft_id: string;
+  day_id: string;
+  created_at: string;
+  narrative: string;
+  proposal: EndDayProposal;
+}
+
+export interface ContextFrame {
+  schema_version: "0.3.2";
+  context_id: string;
+  occurred_at: string;
+  application: string;
+  project: string | null;
+  activity: string;
+  artifact: string | null;
+  visible_intent: string;
+  active_checkpoint: string | null;
+  privacy_classification: "authorized" | "restricted" | "unknown";
+  confidence: number;
+  ambiguity: string[];
+  signal_sources: Array<"active_window" | "accessibility" | "ocr" | "operating_state" | "memory">;
+  changed_fields: string[];
+  text_digest: string | null;
+}
+
+export interface MemoryRetrievalResult {
+  memory: MemoryRecord;
+  score: number;
+  lexical_score: number;
+  vector_score: number;
+  provenance: string;
+}
+
 export interface PlannerExecution<T> {
   proposal: T;
   duration_ms: number;
@@ -289,7 +354,8 @@ export interface PlannerExecution<T> {
 }
 
 export interface V03Planner {
-  draftSetup(input: SetupInput, mainGoal: string): Promise<PlannerExecution<SetupProposal>>;
+  draftSetup(input: SetupInput | CalibrationInput, mainGoal: string): Promise<PlannerExecution<SetupProposal>>;
   draftWeek(input: WeekInput, profile: OperatingProfile, context: string): Promise<PlannerExecution<WeekProposal>>;
   draftDay(project: string, objective: string, profile: OperatingProfile, context: string): Promise<PlannerExecution<DayProposal>>;
+  draftEndDay?(narrative: string, day: DailyPlan, context: string): Promise<PlannerExecution<EndDayProposal>>;
 }

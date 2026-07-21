@@ -10,6 +10,9 @@ export interface V03Config {
   setupSchemaPath: string;
   weekSchemaPath: string;
   daySchemaPath: string;
+  calibrationSchemaPath: string;
+  endDaySchemaPath: string;
+  contextSchemaPath: string;
   v02: V02Config;
 }
 
@@ -26,6 +29,9 @@ export function loadV03Config(applicationRoot?: string): V03Config {
     setupSchemaPath: path.join(contractsDirectory, "v0.3", "setup-proposal.schema.json"),
     weekSchemaPath: path.join(contractsDirectory, "v0.3", "week-proposal.schema.json"),
     daySchemaPath: path.join(contractsDirectory, "v0.3", "day-proposal.schema.json"),
+    calibrationSchemaPath: path.join(contractsDirectory, "v0.3.2", "calibration-proposal.schema.json"),
+    endDaySchemaPath: path.join(contractsDirectory, "v0.3.2", "end-day-proposal.schema.json"),
+    contextSchemaPath: path.join(contractsDirectory, "v0.3.2", "context-frame.schema.json"),
     v02: {
       ...v02,
       dataDirectory: path.join(dataDirectory, "ambient"),

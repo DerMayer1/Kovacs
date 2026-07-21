@@ -6,9 +6,11 @@ import type { AmbientReasoningTelemetry, AmbientState, AmbientStatus } from "../
 import type { V03Store } from "./store.js";
 import type {
   CheckpointCompletionInput,
+  CalibrationInput,
   CheckpointTransitionInput,
   DayProposal,
   EndDayInput,
+  EndDayProposal,
   InterventionFeedbackKind,
   MemoryStatus,
   OperatingSnapshot,
@@ -63,16 +65,16 @@ export class V03Controller {
     try { return await operation(); } finally { this.planning = false; }
   }
 
-  async draftSetup(raw: SetupInput): Promise<OperatingSnapshot> {
+  async draftSetup(raw: SetupInput | CalibrationInput): Promise<OperatingSnapshot> {
     if (this.store.getProfile()) throw new Error("The operating system is already configured. Start a new week instead.");
-    const input: SetupInput = {
+    const input: SetupInput | CalibrationInput = "narrative" in raw ? { narrative: clean(raw.narrative, "Your situation", 6000) } : {
       current_position: clean(raw.current_position, "Current position", 1000),
       available_hours_per_week: Number(raw.available_hours_per_week),
       active_projects: clean(raw.active_projects, "Active projects", 2000),
       weaknesses: clean(raw.weaknesses, "Growth edges", 2000),
       desired_outcome: clean(raw.desired_outcome, "Desired outcome", 2000),
     };
-    if (!Number.isFinite(input.available_hours_per_week) || input.available_hours_per_week < 1 || input.available_hours_per_week > 100) throw new Error("Available hours must be between 1 and 100 per week.");
+    if ("available_hours_per_week" in input && (!Number.isFinite(input.available_hours_per_week) || input.available_hours_per_week < 1 || input.available_hours_per_week > 100)) throw new Error("Available hours must be between 1 and 100 per week.");
     return this.exclusive(async () => {
       const started = Date.now();
       const invocationId = this.store.beginInvocation({ day_id: null, reason: "draft_90_day_mission", urgency: "important", image_attached: false });
@@ -223,6 +225,43 @@ export class V03Controller {
     await this.ambient.endDay(notes);
     this.store.endDay(input);
     this.emit("Day closed. Evidence, lesson, and competency state were updated; observation is stopped.");
+    return this.store.snapshot();
+  }
+
+  async draftEndDay(narrativeInput: string): Promise<OperatingSnapshot> {
+    const narrative = clean(narrativeInput, "What happened today", 6000);
+    const day = this.store.getActiveDay(); if (!day) throw new Error("No active V0.3 day exists.");
+    if (!this.planner.draftEndDay) throw new Error("The configured planner does not support V0.3.2 End Day interpretation.");
+    return this.exclusive(async () => {
+      const started = Date.now();
+      const invocationId = this.store.beginInvocation({ day_id: day.day_id, reason: "draft_end_day", urgency: "important", image_attached: false });
+      try {
+        const execution = await this.planner.draftEndDay!(narrative, day, this.store.contextSummary());
+        this.store.finishInvocation(invocationId, { duration_ms: execution.duration_ms, prompt_characters: execution.prompt_characters,
+          response_characters: JSON.stringify(execution.proposal).length, cached: false, outcome: "proposal", response_used: true });
+        this.store.saveEndDayDraft(day.day_id, narrative, execution.proposal);
+        this.emit("End Day interpreted. Review the evidence classification and confirm before the day is closed.");
+        return this.store.snapshot();
+      } catch (error) {
+        this.store.finishInvocation(invocationId, { duration_ms: Date.now() - started, prompt_characters: 0,
+          response_characters: 0, cached: false, outcome: "failed", response_used: false });
+        throw error;
+      }
+    });
+  }
+
+  async confirmEndDay(draftIdInput: string): Promise<OperatingSnapshot> {
+    const draftId = clean(draftIdInput, "Draft identifier", 100);
+    const draft = this.store.getEndDayDraft();
+    if (!draft || draft.draft_id !== draftId) throw new Error("The End Day proposal no longer exists.");
+    const proposal: EndDayProposal = draft.proposal;
+    return this.endDay({ outcome: proposal.outcome, output_summary: proposal.output_summary,
+      validation_summary: proposal.validation_summary, evidence_source: proposal.evidence_source ?? "self_reported", lesson: proposal.lesson });
+  }
+
+  rejectEndDayDraft(draftId: string, reason: string): OperatingSnapshot {
+    this.store.rejectEndDayDraft(clean(draftId, "Draft identifier", 100), clean(reason, "Rejection reason", 1000));
+    this.emit("End Day proposal rejected. The day remains active.");
     return this.store.snapshot();
   }
 

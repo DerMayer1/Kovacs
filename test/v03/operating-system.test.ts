@@ -10,7 +10,7 @@ import { AmbientStateStore } from "../../src/v02/state-store.js";
 import { createV03Contracts } from "../../src/v03/contracts.js";
 import { V03Controller } from "../../src/v03/controller.js";
 import { V03Store } from "../../src/v03/store.js";
-import type { DayProposal, OperatingProfile, PlannerExecution, SetupInput, SetupProposal, V03Planner, WeekInput, WeekProposal } from "../../src/v03/types.js";
+import type { CalibrationInput, DayProposal, OperatingProfile, PlannerExecution, SetupInput, SetupProposal, V03Planner, WeekInput, WeekProposal } from "../../src/v03/types.js";
 import type { Profile, ProfileResponse, SessionRecord } from "../../src/v01/types.js";
 import type { KovacsService } from "../../src/v01/service.js";
 
@@ -38,7 +38,7 @@ const dayProposal: DayProposal = {
 
 class FakePlanner implements V03Planner {
   calls: string[] = [];
-  async draftSetup(_input: SetupInput): Promise<PlannerExecution<SetupProposal>> { this.calls.push("setup"); return { proposal: setupProposal, duration_ms: 11, prompt_characters: 900 }; }
+  async draftSetup(_input: SetupInput | CalibrationInput): Promise<PlannerExecution<SetupProposal>> { this.calls.push("setup"); return { proposal: setupProposal, duration_ms: 11, prompt_characters: 900 }; }
   async draftWeek(_input: WeekInput, _profile: OperatingProfile): Promise<PlannerExecution<WeekProposal>> { this.calls.push("week"); return { proposal: weekProposal, duration_ms: 12, prompt_characters: 700 }; }
   async draftDay(): Promise<PlannerExecution<DayProposal>> { this.calls.push("day"); return { proposal: dayProposal, duration_ms: 13, prompt_characters: 800 }; }
 }

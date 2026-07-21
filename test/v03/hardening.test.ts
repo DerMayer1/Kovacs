@@ -71,7 +71,7 @@ test("unfinished work and interrupted invocations recover without implicit obser
   assert.equal(reopened.snapshot().recovery.observation_requires_manual_resume, true);
 });
 
-test("a V0.3.0 database receives additive V0.3.1 migrations", async (t) => {
+test("a V0.3.0 database receives additive migrations through V0.3.2", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "kovacs-v030-migration-"));
   const database = path.join(directory, "kovacs.db"), legacy = new DatabaseSync(database);
   legacy.exec(`
@@ -83,7 +83,7 @@ test("a V0.3.0 database receives additive V0.3.1 migrations", async (t) => {
   `); legacy.close();
   const contracts = await createV03Contracts(path.join(root, "contracts")), migrated = await V03Store.create(database, contracts);
   t.after(async () => { migrated.close(); await rm(directory, { recursive: true, force: true }); });
-  assert.equal(migrated.snapshot().recovery.schema_version_applied, "0.3.1");
+  assert.equal(migrated.snapshot().recovery.schema_version_applied, "0.3.2");
   assert.equal(migrated.snapshot().usage_today.response_characters, 0);
   assert.equal(migrated.snapshot().retention.persist_window_titles, false);
 });
@@ -121,7 +121,7 @@ test("feedback, scoped memory deletion, retention, backup, and export remain loc
   assert.equal(x.store.snapshot().recent_feedback[0]?.kind, "wrong_context");
   assert.equal(x.store.setRetentionPolicy(null, 14).sensitive_memory_retention_days, 14);
   const backup = await x.store.createBackup(path.join(x.directory, "backup")); await access(backup.database); await access(backup.export);
-  const exported = await readFile(backup.export, "utf8"); assert.match(exported, /"schema_version": "0.3.1"/); assert.doesNotMatch(exported, /"window_title":/);
+  const exported = await readFile(backup.export, "utf8"); assert.match(exported, /"schema_version": "0.3.2"/); assert.doesNotMatch(exported, /"window_title":/);
 });
 
 test("drafts can be revised or rejected without becoming active", async (t) => {
