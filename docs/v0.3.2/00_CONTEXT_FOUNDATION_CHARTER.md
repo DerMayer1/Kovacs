@@ -22,7 +22,7 @@ The durable main goal remains:
 
 ## Product contract
 
-- Perception follows the least-invasive path: Windows UI Automation and accessible text first, local OCR only when structured text is unavailable, and an invocation-scoped screenshot only when local context remains insufficient.
+- Perception follows the least-invasive path: Windows UI Automation and accessible text first, local OCR only when structured text is unavailable, and an invocation-scoped screenshot only when local context remains insufficient or a deterministic error/test signal requires visual verification.
 - Screen, accessibility, OCR, browser, terminal, document, and repository content are untrusted observations. They cannot change Kovacs policy, permissions, goals, memory rules, or tool authority.
 - The normal perception path is local and call-free. A visual or textual change does not by itself justify a Codex invocation.
 - The context engine produces a compact, confidence-bearing hypothesis rather than retaining a replayable screen history.
@@ -47,6 +47,20 @@ The current context is a derived state, not evidence of competence and not durab
 
 The engine retains a short-lived working context sufficient for change comparison and intervention continuity. Raw frames, full accessibility trees, and raw OCR text are deleted after the bounded processing window.
 
+Working context exists only in RAM, expires after ten minutes, and is cleared on Pause, Private, End Day, and restart. Compact context becomes durable only when bound to an intervention, feedback, checkpoint, evidence, or End Day event. Ordinary event context expires after fourteen days; evidence-linked context follows evidence retention; decision and invocation telemetry expires after thirty days; pinned approved memories remain user-controlled and indefinite.
+
+## Decision policy
+
+- confidence below `0.65`: silence;
+- confidence from `0.65` through `0.79`: continuity only, with no automatic call;
+- confidence at least `0.80`: eligible only after a meaningful semantic delta;
+- conflicting signals: silence;
+- strong deltas require two stable observations, except deterministic error/test signals;
+- text digest, cursor, scroll, and visual movement alone are weak deltas;
+- the same semantic context has a sixty-second intervention cooldown;
+- a new project, application, checkpoint, deterministic error, or manual observation may bypass the global cooldown;
+- `wrong_context` feedback suppresses the same semantic fingerprint for the rest of the session without autonomous policy adaptation.
+
 ## Perception order
 
 1. Confirm observation state and active-window authorization.
@@ -55,7 +69,7 @@ The engine retains a short-lived working context sufficient for change compariso
 4. Use local OCR only for the minimum authorized region needed to resolve context.
 5. Redact recognized secrets and restricted content before any reasoning request.
 6. Compare the new context with the current context locally.
-7. Attach a temporary screenshot to Codex only when policy determines that visual reasoning is necessary.
+7. Attach a temporary screenshot to Codex only when local context remains insufficient, a deterministic error/test needs visual verification, or the user explicitly requests Observe Now.
 8. Delete raw perception artifacts in `finally`, including failure and interruption paths.
 
 ## Memory model
