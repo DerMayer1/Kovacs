@@ -78,5 +78,6 @@ export interface AmbientReasoningTelemetry {
 
 export interface AmbientControllerOptions {
   operatingContext?: () => string | Promise<string>;
+  contextualize?: (window: ActiveWindowInfo, imagePath: string) => string | Promise<string>;
   onReasoningComplete?: (telemetry: AmbientReasoningTelemetry) => void | Promise<void>;
 }
