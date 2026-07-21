@@ -48,11 +48,35 @@ test("context engine persists a compact frame without raw title or extracted tex
   const engine = new LocalContextEngine(), secret = "Client Omega confidential";
   const frame = engine.analyze({ application: "Code.exe", windowTitle: `${secret} controller.ts`, project: x.project,
     activeCheckpoint: "Diagnose test", accessibilityText: `failing assertion ${secret}`, ocrText: "Expected 2 received 3", previous: null });
-  x.store.recordContextFrame(frame);
+  x.store.recordContextFrame(frame, { kind: "evidence", occurred_at: new Date().toISOString(), context_id: frame.context_id,
+    reference_id: "ev_context_test", retention_class: "evidence" });
   const durable = JSON.stringify(x.store.snapshot().recent_context);
   assert.doesNotMatch(durable, /Client Omega confidential/);
   assert.equal(frame.text_digest?.length, 64);
   assert.deepEqual(frame.signal_sources, ["active_window", "operating_state", "accessibility", "ocr"]);
+});
+
+test("context lifecycle persists only event-bound frames and prunes compact telemetry", async (t) => {
+  const x = await fixture(); t.after(x.cleanup);
+  const engine = new LocalContextEngine(), old = "2020-01-01T00:00:00.000Z";
+  const base = engine.analyze({ application: "Code.exe", windowTitle: "controller.ts", project: x.project,
+    activeCheckpoint: "Validate lifecycle", accessibilityText: "reviewing controller architecture", ocrText: "", previous: null });
+  assert.equal(x.store.snapshot().recent_context.length, 0);
+  const expiringId = `ctx_${"e".repeat(32)}`, evidenceId = `ctx_${"f".repeat(32)}`;
+  x.store.recordContextFrame({ ...base, context_id: expiringId, occurred_at: old }, {
+    kind: "intervention", occurred_at: old, context_id: expiringId, reference_id: "req_old", retention_class: "event",
+  });
+  x.store.recordContextFrame({ ...base, context_id: evidenceId, occurred_at: old }, {
+    kind: "evidence", occurred_at: old, context_id: evidenceId, reference_id: "ev_keep", retention_class: "evidence",
+  });
+  x.store.recordContextDecision({ occurred_at: old, context_id: "ctx_expiring", application: "Code.exe", confidence: 0.9,
+    perception_path: "uia", decision: "silence", reason: "same_context_cooldown", changed_fields: [],
+    fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), image_attached: false, bypass_global_cooldown: false });
+  const policy = x.store.retentionPolicy();
+  assert.equal(policy.context_retention_days, 14); assert.equal(policy.telemetry_retention_days, 30);
+  x.store.applyRetention();
+  assert.deepEqual(x.store.listContextFrames().map((frame) => frame.context_id), [evidenceId]);
+  assert.equal(x.store.listContextDecisions().length, 0);
 });
 
 test("local vectors are deterministic and hybrid retrieval exposes provenance", async (t) => {
@@ -82,7 +106,7 @@ test("End Day interpretation remains a draft until confirmed by the close path",
 test("V0.3.2 migration is additive and backup excludes raw perception", async (t) => {
   const x = await fixture();
   const sqlite = new DatabaseSync(x.database); const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>; sqlite.close();
-  assert.ok(["context_frames", "memory_vectors", "end_day_drafts"].every((name) => tables.some((table) => table.name === name)));
+  assert.ok(["context_frames", "context_events", "context_decisions", "memory_vectors", "end_day_drafts"].every((name) => tables.some((table) => table.name === name)));
   const backup = await x.store.createBackup(path.join(x.directory, "backup")); const exported = await readFile(backup.export, "utf8");
   assert.match(exported, /"schema_version": "0.3.2"/); assert.doesNotMatch(exported, /ocrText|accessibilityText|"window_title":/);
   await x.cleanup(); t.after(() => Promise.resolve());

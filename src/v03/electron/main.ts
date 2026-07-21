@@ -68,7 +68,7 @@ async function bootstrap(): Promise<void> {
   const perception = new WindowsPerception(path.join(config.applicationRoot, "scripts"));
   const perceptionCascade = new PerceptionCascade(perception, contextEngine);
   let lastContext: ContextFrame | null = null;
-  let lastContextFingerprint: string | null = null;
+  const workingFrames = new Map<string, { frame: ContextFrame; observedAt: number }>();
   let operating: V03Controller;
   const ambient = new AmbientController(service, ambientStore, settings, new WindowsActiveWindowProbe(), new ElectronWindowCapture(), {
     operatingContext: () => operating?.contextSummary() ?? "",
@@ -77,8 +77,10 @@ async function bootstrap(): Promise<void> {
       const result = await perceptionCascade.observe({ window, project: day?.project ?? null,
         activeCheckpoint: day?.checkpoints.find((item) => item.status === "active")?.title ?? null,
         previous: lastContext, capture });
-      if (result.fingerprint !== lastContextFingerprint) store?.recordContextFrame(result.frame);
-      lastContext = result.frame; lastContextFingerprint = result.fingerprint;
+      const cutoff = Date.now() - 10 * 60_000;
+      for (const [contextId, entry] of workingFrames) if (entry.observedAt < cutoff) workingFrames.delete(contextId);
+      workingFrames.set(result.frame.context_id, { frame: result.frame, observedAt: Date.now() });
+      lastContext = result.frame;
       const query = `${result.frame.activity} ${result.frame.visible_intent} ${result.frame.artifact ?? ""} ${day?.objective ?? ""}`;
       const memories = store?.searchMemories(query, 3) ?? [];
       return { context: `${contextEngine.summarize(result.frame, memories)}\nPerception path: ${result.capture_used ? result.screenshot ? "UIA -> OCR -> screenshot" : "UIA -> OCR" : "UIA only"}${result.failures.length ? `\nLocal perception limitations: ${result.failures.join(" | ")}` : ""}`,
@@ -88,6 +90,12 @@ async function bootstrap(): Promise<void> {
         deterministic_trigger: result.deterministic_trigger, changed_fields: result.frame.changed_fields,
         screenshot: result.screenshot, capture_used: result.capture_used, ocr_used: result.ocr_used };
     },
+    onContextDecision: (decision) => { store?.recordContextDecision(decision); },
+    onContextEvent: (event) => {
+      const entry = workingFrames.get(event.context_id);
+      if (entry && Date.now() - entry.observedAt <= 10 * 60_000) store?.recordContextFrame(entry.frame, event);
+    },
+    onWorkingContextCleared: () => { workingFrames.clear(); lastContext = null; },
     onReasoningComplete: (telemetry) => operating?.recordAmbientInvocation(telemetry),
   });
   operating = new V03Controller(ambient, store, new CodexV03Planner(config, v03Contracts));

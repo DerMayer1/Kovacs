@@ -163,11 +163,12 @@ export class V03Controller {
 
   async observeNow(): Promise<void> { await this.ambient.observeNow(); }
 
-  completeCheckpoint(input: CheckpointCompletionInput): OperatingSnapshot {
+  async completeCheckpoint(input: CheckpointCompletionInput): Promise<OperatingSnapshot> {
     clean(input.checkpoint_id, "Checkpoint identifier", 100);
     clean(input.result, "Checkpoint result", 2000);
     clean(input.validation, "Validation evidence", 2000);
-    this.store.completeCheckpoint(input);
+    const evidence = this.store.completeCheckpoint(input);
+    await this.ambient.recordContextMilestone("evidence", evidence.evidence_id, "evidence");
     this.emit("Checkpoint closed with structured evidence. The next checkpoint is now active.");
     return this.store.snapshot();
   }
@@ -202,8 +203,9 @@ export class V03Controller {
     return this.store.snapshot();
   }
 
-  transitionCheckpoint(input: CheckpointTransitionInput): OperatingSnapshot {
+  async transitionCheckpoint(input: CheckpointTransitionInput): Promise<OperatingSnapshot> {
     this.store.transitionCheckpoint({ checkpoint_id: clean(input.checkpoint_id, "Checkpoint identifier", 100), status: input.status, reason: clean(input.reason, "Checkpoint reason", 1000) });
+    await this.ambient.recordContextMilestone("checkpoint", input.checkpoint_id);
     this.emit(`Checkpoint marked ${input.status}.`);
     return this.store.snapshot();
   }
@@ -272,7 +274,13 @@ export class V03Controller {
   deleteMemoriesByDay(dayId: string): OperatingSnapshot { this.store.deleteMemoriesByDay(clean(dayId, "Day identifier", 100)); this.emit("Unpinned memories from the day were deleted."); return this.store.snapshot(); }
   deleteMemoriesBySession(sessionId: string): OperatingSnapshot { this.store.deleteMemoriesBySession(clean(sessionId, "Session identifier", 100)); this.emit("Unpinned memories from the session were deleted."); return this.store.snapshot(); }
   setRetentionPolicy(memoryDays: number | null, sensitiveDays: number): OperatingSnapshot { this.store.setRetentionPolicy(memoryDays, sensitiveDays); this.emit("Local retention policy updated and applied."); return this.store.snapshot(); }
-  addInterventionFeedback(requestId: string, kind: InterventionFeedbackKind, note?: string): OperatingSnapshot { this.store.addInterventionFeedback(clean(requestId, "Request identifier", 100), kind, note?.trim() || null); this.emit("Intervention feedback recorded locally."); return this.store.snapshot(); }
+  async addInterventionFeedback(requestId: string, kind: InterventionFeedbackKind, note?: string): Promise<OperatingSnapshot> {
+    const normalizedRequestId = clean(requestId, "Request identifier", 100);
+    this.store.addInterventionFeedback(normalizedRequestId, kind, note?.trim() || null);
+    await this.ambient.recordContextFeedback(normalizedRequestId, kind);
+    this.emit("Intervention feedback recorded locally.");
+    return this.store.snapshot();
+  }
   async createBackup(destinationDirectory: string): Promise<{ database: string; export: string }> { return this.store.createBackup(path.resolve(clean(destinationDirectory, "Backup directory", 2048))); }
 
   recordAmbientInvocation(telemetry: AmbientReasoningTelemetry): void {

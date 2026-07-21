@@ -29,7 +29,12 @@ try {
   const day = store.startDay(store.snapshot().pending_day!.draft_id, "ambient_v032_smoke");
   const engine = new LocalContextEngine();
   const frame = engine.analyze({ application: "Code.exe", windowTitle: "secret-client - controller.ts", project, activeCheckpoint: day.checkpoints[0]!.title, accessibilityText: "test controller.ts failing assertion", ocrText: "Error expected true", previous: null });
-  store.recordContextFrame(frame);
+  store.recordContextFrame(frame, { kind: "checkpoint", occurred_at: new Date().toISOString(), context_id: frame.context_id,
+    reference_id: day.checkpoints[0]!.checkpoint_id, retention_class: "event" });
+  store.recordContextDecision({ occurred_at: new Date().toISOString(), context_id: frame.context_id, application: frame.application,
+    confidence: frame.confidence, perception_path: "uia_ocr", decision: "call", reason: "deterministic_trigger",
+    changed_fields: frame.changed_fields, fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64),
+    image_attached: false, bypass_global_cooldown: true });
   const memories = store.searchMemories("Kovacs contextual judgment", 3);
   const proposal = { schema_version: "0.3.2" as const, narrative_summary: "Context foundation was exercised locally.", outcome: "partially_achieved" as const, output_summary: "Local context frame and memory retrieval completed", validation_summary: "Smoke assertions inspect persisted sanitized state", evidence_source: "tool_verified" as const, lesson: "Persist derived context, not raw screen text", missing_proof: ["Native OCR acceptance remains a live check"], carry_forward: ["Run live OCR acceptance"], assumptions: [] };
   const draft = store.saveEndDayDraft(day.day_id, "I exercised context and memory, but native OCR still needs live acceptance.", proposal);
@@ -39,7 +44,8 @@ try {
   const snapshot = store.snapshot();
   const checks = { schema: snapshot.recovery.schema_version_applied === "0.3.2", context_sanitized: !JSON.stringify(snapshot.recent_context).includes("secret-client") && frame.text_digest?.length === 64,
     vector_retrieval: memories.length > 0 && memories[0]!.provenance.startsWith("local-hybrid"), proposal_required: stillActive && draft.draft_id.startsWith("draft_"),
-    end_confirmed: snapshot.active_day === null && snapshot.pending_end_day === null, backup: true, no_window_titles: snapshot.retention.persist_window_titles === false };
+    end_confirmed: snapshot.active_day === null && snapshot.pending_end_day === null, diagnostics: snapshot.context_diagnostics.length === 1,
+    backup: true, no_window_titles: snapshot.retention.persist_window_titles === false };
   console.log(JSON.stringify({ checks, context: frame, retrieval: memories.map((item) => ({ claim: item.memory.claim, score: item.score, provenance: item.provenance })) }, null, 2));
   if (Object.values(checks).some((value) => !value)) process.exitCode = 1;
 } finally { store?.close(); await rm(temporary, { recursive: true, force: true }); }

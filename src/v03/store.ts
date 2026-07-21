@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AssistanceLevel, MemoryCandidate } from "../v01/types.js";
+import type { AmbientContextDecision, AmbientContextEvent } from "../v02/types.js";
 import { cosineSimilarity, embedLocally, lexicalSimilarity, vectorSourceHash } from "../v032/memory.js";
 import type { V03Contracts } from "./contracts.js";
 import {
@@ -41,7 +42,7 @@ import {
   type ContextFrame,
 } from "./types.js";
 
-const identifier = (prefix: "draft" | "day" | "cp" | "ev" | "mem" | "inv" | "fb" | "audit" | "ctx") => `${prefix}_${randomUUID().replaceAll("-", "")}`;
+const identifier = (prefix: "draft" | "day" | "cp" | "ev" | "mem" | "inv" | "fb" | "audit" | "ctx" | "cde" | "cev") => `${prefix}_${randomUUID().replaceAll("-", "")}`;
 const now = (): string => new Date().toISOString();
 const json = <T>(value: string): T => JSON.parse(value) as T;
 
@@ -54,6 +55,7 @@ interface MemoryRow { memory_id: string; kind: MemoryRecord["kind"]; claim: stri
 interface EndDayDraftRow { draft_id: string; day_id: string; created_at: string; narrative: string; proposal_json: string; }
 interface MemoryVectorRow { memory_id: string; dimensions: number; vector_json: string; source_hash: string; created_at: string; }
 interface ContextFrameRow { context_id: string; occurred_at: string; application: string; project: string | null; activity: string; artifact: string | null; visible_intent: string; active_checkpoint: string | null; privacy_classification: ContextFrame["privacy_classification"]; confidence: number; ambiguity_json: string; signal_sources_json: string; changed_fields_json: string; text_digest: string | null; }
+interface ContextDecisionRow { occurred_at: string; context_id: string; application: string; confidence: number; perception_path: AmbientContextDecision["perception_path"]; decision: AmbientContextDecision["decision"]; reason: AmbientContextDecision["reason"]; changed_fields_json: string; fingerprint: string; semantic_fingerprint: string; image_attached: number; bypass_global_cooldown: number; }
 
 export interface InvocationInput {
   day_id: string | null;
@@ -142,9 +144,12 @@ export class V03Store {
       CREATE TABLE IF NOT EXISTS retention_policy (
         singleton INTEGER PRIMARY KEY CHECK (singleton = 1), memory_retention_days INTEGER,
         sensitive_memory_retention_days INTEGER NOT NULL, persist_window_titles INTEGER NOT NULL CHECK (persist_window_titles = 0),
-        last_pruned_at TEXT
+        last_pruned_at TEXT, context_retention_days INTEGER NOT NULL DEFAULT 14,
+        telemetry_retention_days INTEGER NOT NULL DEFAULT 30
       );
-      INSERT OR IGNORE INTO retention_policy VALUES (1, NULL, 30, 0, NULL);
+      INSERT OR IGNORE INTO retention_policy
+        (singleton, memory_retention_days, sensitive_memory_retention_days, persist_window_titles, last_pruned_at)
+        VALUES (1, NULL, 30, 0, NULL);
       CREATE TABLE IF NOT EXISTS intervention_feedback (
         feedback_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, day_id TEXT,
         kind TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL
@@ -169,6 +174,21 @@ export class V03Store {
         changed_fields_json TEXT NOT NULL, text_digest TEXT
       );
       CREATE INDEX IF NOT EXISTS context_frames_time ON context_frames(occurred_at DESC);
+      CREATE TABLE IF NOT EXISTS context_events (
+        context_event_id TEXT PRIMARY KEY, context_id TEXT NOT NULL REFERENCES context_frames(context_id) ON DELETE CASCADE,
+        event_kind TEXT NOT NULL, reference_id TEXT, retention_class TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS context_events_time ON context_events(occurred_at DESC);
+      CREATE INDEX IF NOT EXISTS context_events_context ON context_events(context_id);
+      CREATE TABLE IF NOT EXISTS context_decisions (
+        decision_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, context_id TEXT NOT NULL,
+        application TEXT NOT NULL, confidence REAL NOT NULL, perception_path TEXT NOT NULL,
+        decision TEXT NOT NULL, reason TEXT NOT NULL, changed_fields_json TEXT NOT NULL,
+        fingerprint TEXT NOT NULL, semantic_fingerprint TEXT NOT NULL,
+        image_attached INTEGER NOT NULL, bypass_global_cooldown INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS context_decisions_time ON context_decisions(occurred_at DESC);
     `);
     this.ensureColumn("day_plans", "revision", "INTEGER NOT NULL DEFAULT 1");
     this.ensureColumn("day_plans", "summary_json", "TEXT");
@@ -181,6 +201,8 @@ export class V03Store {
     this.ensureColumn("invocations", "model", "TEXT");
     this.ensureColumn("invocations", "trigger_event_id", "TEXT");
     this.ensureColumn("invocations", "response_used", "INTEGER NOT NULL DEFAULT 1");
+    this.ensureColumn("retention_policy", "context_retention_days", "INTEGER NOT NULL DEFAULT 14");
+    this.ensureColumn("retention_policy", "telemetry_retention_days", "INTEGER NOT NULL DEFAULT 30");
     this.db.prepare("UPDATE checkpoints SET lifecycle_status=CASE status WHEN 'skipped' THEN 'abandoned' ELSE status END WHERE lifecycle_status IS NULL").run();
     this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS one_active_checkpoint_per_day ON checkpoints(day_id) WHERE lifecycle_status='active'");
     this.db.prepare("UPDATE evidence SET source='self_reported' WHERE source IN ('user_reported','validated')").run();
@@ -565,16 +587,45 @@ export class V03Store {
     this.audit("end_day_draft", draftId, "end_day_rejected", reason);
   }
 
-  recordContextFrame(frame: ContextFrame): ContextFrame {
+  recordContextFrame(frame: ContextFrame, event: AmbientContextEvent): ContextFrame {
     this.contracts.validateContextFrame(frame);
-    this.db.prepare(`INSERT OR REPLACE INTO context_frames
+    if (event.context_id !== frame.context_id) throw new Error("Context event does not match its frame.");
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare(`INSERT INTO context_frames
       (context_id, occurred_at, application, project, activity, artifact, visible_intent, active_checkpoint,
        privacy_classification, confidence, ambiguity_json, signal_sources_json, changed_fields_json, text_digest)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(frame.context_id, frame.occurred_at, frame.application, frame.project, frame.activity, frame.artifact,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(context_id) DO UPDATE SET confidence=excluded.confidence, changed_fields_json=excluded.changed_fields_json`)
+        .run(frame.context_id, frame.occurred_at, frame.application, frame.project, frame.activity, frame.artifact,
         frame.visible_intent, frame.active_checkpoint, frame.privacy_classification, frame.confidence,
         JSON.stringify(frame.ambiguity), JSON.stringify(frame.signal_sources), JSON.stringify(frame.changed_fields), frame.text_digest);
+      this.db.prepare("INSERT INTO context_events VALUES (?, ?, ?, ?, ?, ?)")
+        .run(identifier("cev"), frame.context_id, event.kind, event.reference_id, event.retention_class, event.occurred_at);
+      this.db.exec("COMMIT");
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     return frame;
+  }
+
+  recordContextDecision(decision: AmbientContextDecision): AmbientContextDecision {
+    this.db.prepare(`INSERT INTO context_decisions
+      (decision_id, occurred_at, context_id, application, confidence, perception_path, decision, reason,
+       changed_fields_json, fingerprint, semantic_fingerprint, image_attached, bypass_global_cooldown)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(identifier("cde"), decision.occurred_at, decision.context_id, decision.application, decision.confidence,
+        decision.perception_path, decision.decision, decision.reason, JSON.stringify(decision.changed_fields),
+        decision.fingerprint, decision.semantic_fingerprint, Number(decision.image_attached), Number(decision.bypass_global_cooldown));
+    return decision;
+  }
+
+  listContextDecisions(limit = 50): AmbientContextDecision[] {
+    const rows = this.db.prepare("SELECT * FROM context_decisions ORDER BY occurred_at DESC LIMIT ?")
+      .all(Math.max(1, Math.min(200, limit))) as unknown as ContextDecisionRow[];
+    return rows.map((row) => ({ occurred_at: row.occurred_at, context_id: row.context_id, application: row.application,
+      confidence: row.confidence, perception_path: row.perception_path, decision: row.decision, reason: row.reason,
+      changed_fields: json<string[]>(row.changed_fields_json), fingerprint: row.fingerprint,
+      semantic_fingerprint: row.semantic_fingerprint, image_attached: Boolean(row.image_attached),
+      bypass_global_cooldown: Boolean(row.bypass_global_cooldown) }));
   }
 
   listContextFrames(limit = 25): ContextFrame[] {
@@ -775,8 +826,10 @@ export class V03Store {
   }
 
   retentionPolicy(): RetentionPolicy {
-    const row = this.db.prepare("SELECT * FROM retention_policy WHERE singleton=1").get() as { memory_retention_days: number | null; sensitive_memory_retention_days: number; last_pruned_at: string | null };
-    return { schema_version: "0.3.1", memory_retention_days: row.memory_retention_days, sensitive_memory_retention_days: row.sensitive_memory_retention_days, persist_window_titles: false, last_pruned_at: row.last_pruned_at };
+    const row = this.db.prepare("SELECT * FROM retention_policy WHERE singleton=1").get() as { memory_retention_days: number | null; sensitive_memory_retention_days: number; context_retention_days: 14; telemetry_retention_days: 30; last_pruned_at: string | null };
+    return { schema_version: "0.3.2", memory_retention_days: row.memory_retention_days, sensitive_memory_retention_days: row.sensitive_memory_retention_days,
+      context_retention_days: row.context_retention_days, telemetry_retention_days: row.telemetry_retention_days,
+      persist_window_titles: false, last_pruned_at: row.last_pruned_at };
   }
 
   setRetentionPolicy(memoryRetentionDays: number | null, sensitiveRetentionDays: number): RetentionPolicy {
@@ -797,6 +850,15 @@ export class V03Store {
       removed += Number(this.db.prepare(`DELETE FROM memories WHERE pinned=0 AND sensitivity!='sensitive'
         AND datetime(updated_at) < datetime('now', ?)`).run(`-${policy.memory_retention_days} days`).changes);
     }
+    removed += Number(this.db.prepare(`DELETE FROM context_events WHERE retention_class='event'
+      AND datetime(occurred_at) < datetime('now', ?)`).run(`-${policy.context_retention_days} days`).changes);
+    removed += Number(this.db.prepare("DELETE FROM context_frames WHERE NOT EXISTS (SELECT 1 FROM context_events WHERE context_events.context_id=context_frames.context_id)").run().changes);
+    removed += Number(this.db.prepare(`DELETE FROM context_decisions WHERE datetime(occurred_at) < datetime('now', ?)`)
+      .run(`-${policy.telemetry_retention_days} days`).changes);
+    removed += Number(this.db.prepare(`DELETE FROM invocations WHERE datetime(created_at) < datetime('now', ?)`)
+      .run(`-${policy.telemetry_retention_days} days`).changes);
+    removed += Number(this.db.prepare(`DELETE FROM intervention_feedback WHERE datetime(created_at) < datetime('now', ?)`)
+      .run(`-${policy.context_retention_days} days`).changes);
     this.db.prepare("UPDATE retention_policy SET last_pruned_at=? WHERE singleton=1").run(now());
     if (removed) this.db.exec("PRAGMA wal_checkpoint(PASSIVE)");
     return removed;
@@ -813,6 +875,8 @@ export class V03Store {
       schema_version: "0.3.2", exported_at: now(), source_database: path.basename(this.databasePath),
       profile: this.getProfile(), days: this.listDays(), evidence: this.listEvidence(), competencies: this.listCompetencies(), memories: this.listMemories(),
       context_frames: this.listContextFrames(100),
+      context_events: this.db.prepare("SELECT * FROM context_events ORDER BY occurred_at DESC").all(),
+      context_decisions: this.listContextDecisions(200),
       memory_index: this.db.prepare("SELECT memory_id, dimensions, source_hash, created_at FROM memory_vectors ORDER BY created_at DESC").all(),
       usage_today: this.usageToday(), retention: this.retentionPolicy(), recent_feedback: this.listInterventionFeedback(100),
       lifecycle_audit: this.db.prepare("SELECT * FROM lifecycle_audit ORDER BY created_at DESC").all(),
@@ -838,6 +902,7 @@ export class V03Store {
     return {
       profile: this.getProfile(), active_day: this.getActiveDay(), pending_setup: this.setupDraft(), pending_week: this.weekDraft(), pending_day: this.dayDraft(),
       pending_end_day: this.getEndDayDraft(), recent_context: this.listContextFrames(),
+      context_diagnostics: this.listContextDecisions(),
       competencies: this.listCompetencies(), recent_evidence: this.listEvidence().slice(0, 50), memories: this.listMemories(), usage_today: this.usageToday(),
       recovery: this.recovery, retention: this.retentionPolicy(), recent_feedback: this.listInterventionFeedback(),
     };

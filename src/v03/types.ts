@@ -1,5 +1,5 @@
 import type { AssistanceLevel } from "../v01/types.js";
-import type { AmbientState, AmbientUpdate } from "../v02/types.js";
+import type { AmbientContextDecision, AmbientState, AmbientUpdate } from "../v02/types.js";
 
 export const COMPETENCIES = [
   "software_design_implementation",
@@ -237,9 +237,11 @@ export interface RecoveryStatus {
 }
 
 export interface RetentionPolicy {
-  schema_version: "0.3.1";
+  schema_version: "0.3.2";
   memory_retention_days: number | null;
   sensitive_memory_retention_days: number;
+  context_retention_days: 14;
+  telemetry_retention_days: 30;
   persist_window_titles: false;
   last_pruned_at: string | null;
 }
@@ -268,6 +270,7 @@ export interface OperatingSnapshot {
   recent_feedback: InterventionFeedback[];
   pending_end_day: EndDayDraft | null;
   recent_context: ContextFrame[];
+  context_diagnostics: AmbientContextDecision[];
 }
 
 export interface V03Update {
