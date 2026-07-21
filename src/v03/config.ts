@@ -13,6 +13,7 @@ export interface V03Config {
   calibrationSchemaPath: string;
   endDaySchemaPath: string;
   contextSchemaPath: string;
+  restrictedTerms: string[];
   v02: V02Config;
 }
 
@@ -32,6 +33,7 @@ export function loadV03Config(applicationRoot?: string): V03Config {
     calibrationSchemaPath: path.join(contractsDirectory, "v0.3.2", "calibration-proposal.schema.json"),
     endDaySchemaPath: path.join(contractsDirectory, "v0.3.2", "end-day-proposal.schema.json"),
     contextSchemaPath: path.join(contractsDirectory, "v0.3.2", "context-frame.schema.json"),
+    restrictedTerms: (process.env.KOVACS_RESTRICTED_TERMS ?? "").split(",").map((item) => item.trim()).filter((item) => item.length >= 2).slice(0, 100),
     v02: {
       ...v02,
       dataDirectory: path.join(dataDirectory, "ambient"),

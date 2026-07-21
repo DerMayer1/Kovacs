@@ -47,10 +47,12 @@ export class AmbientContextDecisionEngine {
     const base = { occurred_at: new Date(at).toISOString(), context_id: perception.context_id, application: window.application,
       confidence: perception.confidence, perception_path: perception.screenshot ? "uia_ocr_screenshot" as const : perception.ocr_used ? "uia_ocr" as const : "uia" as const,
       changed_fields: [...this.candidateFields], fingerprint: perception.fingerprint,
-      semantic_fingerprint: perception.semantic_fingerprint, image_attached: Boolean(perception.screenshot) };
+      semantic_fingerprint: perception.semantic_fingerprint, image_attached: Boolean(perception.screenshot),
+      sensitive_categories: perception.sensitive_categories, screenshot_blocked_reason: perception.screenshot_blocked_reason };
     const result = (decision: AmbientContextDecision["decision"], reason: AmbientContextDecision["reason"], bypass = false): AmbientContextDecision => ({ ...base, decision, reason, bypass_global_cooldown: bypass });
 
     if (manual) return result("call", "manual", true);
+    if (perception.prompt_injection_detected) return result("silence", "untrusted_instruction");
     if (this.suppressedFingerprints.has(perception.semantic_fingerprint)) return result("silence", "suppressed_by_feedback");
     if (perception.conflicting) return result("silence", "conflicting_signals");
     if (perception.confidence < 0.65) return result("silence", "low_confidence");

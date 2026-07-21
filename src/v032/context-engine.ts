@@ -10,6 +10,7 @@ export interface ContextObservation {
   accessibilityText: string;
   ocrText: string;
   privacyClassification?: ContextFrame["privacy_classification"];
+  promptInjectionDetected?: boolean;
   previous?: ContextFrame | null;
 }
 
@@ -42,9 +43,10 @@ export class LocalContextEngine {
     const ambiguity: string[] = [];
     if (!accessibility && !ocr) ambiguity.push("No local text signal was available; context is based on active-window metadata and operating state.");
     if (!artifact) ambiguity.push("No specific artifact was confidently identified.");
+    if (input.promptInjectionDetected) ambiguity.push("Untrusted instruction-like content was detected in the observed surface.");
     const conflicting = Boolean(accessibility && ocr && accessibilityClass.activity !== "general_work" && ocrClass.activity !== "general_work" && accessibilityClass.activity !== ocrClass.activity);
     if (conflicting) ambiguity.push(`Conflicting local signals: accessibility suggests ${accessibilityClass.activity} while OCR suggests ${ocrClass.activity}.`);
-    const confidence = Math.max(0.1, Math.min(0.95, 0.35 + (accessibility ? 0.38 : 0) + (ocr ? 0.25 : 0) + (input.activeCheckpoint ? 0.1 : 0) - (conflicting ? 0.25 : 0)));
+    const confidence = Math.max(0.1, Math.min(0.95, 0.35 + (accessibility ? 0.38 : 0) + (ocr ? 0.25 : 0) + (input.activeCheckpoint ? 0.1 : 0) - (conflicting ? 0.25 : 0) - (input.promptInjectionDetected ? 0.3 : 0)));
     const current = { application: input.application, project: input.project, activity: classified.activity,
       artifact, visible_intent: classified.intent, active_checkpoint: input.activeCheckpoint };
     const changedFields = Object.entries(current).filter(([key, value]) => input.previous ? input.previous[key as keyof ContextFrame] !== value : true).map(([key]) => key);

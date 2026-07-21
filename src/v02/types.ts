@@ -1,4 +1,5 @@
 import type { ProfileResponse } from "../v01/types.js";
+import type { SensitiveContentCategory } from "../v01/privacy.js";
 
 export type AmbientStatus = "idle" | "observing" | "paused" | "private" | "ended";
 export type AmbientUrgency = "normal" | "important" | "critical";
@@ -66,6 +67,10 @@ export interface AmbientLocalPerceptionResult {
   sufficient: boolean;
   conflicting: boolean;
   deterministic_trigger: boolean;
+  prompt_injection_detected: boolean;
+  sensitive_content_detected: boolean;
+  sensitive_categories: SensitiveContentCategory[];
+  screenshot_blocked_reason: "sensitive_content" | "ocr_unavailable" | null;
   changed_fields: string[];
   screenshot: Buffer | null;
   capture_used: boolean;
@@ -80,11 +85,13 @@ export interface AmbientContextDecision {
   confidence: number;
   perception_path: "uia" | "uia_ocr" | "uia_ocr_screenshot";
   decision: AmbientContextDecisionKind;
-  reason: "manual" | "private_or_unauthorized" | "conflicting_signals" | "low_confidence" | "medium_confidence" | "awaiting_stability" | "weak_delta" | "same_context_cooldown" | "suppressed_by_feedback" | "stable_strong_delta" | "deterministic_trigger" | "unchanged";
+  reason: "manual" | "private_or_unauthorized" | "untrusted_instruction" | "conflicting_signals" | "low_confidence" | "medium_confidence" | "awaiting_stability" | "weak_delta" | "same_context_cooldown" | "suppressed_by_feedback" | "stable_strong_delta" | "deterministic_trigger" | "unchanged";
   changed_fields: string[];
   fingerprint: string;
   semantic_fingerprint: string;
   image_attached: boolean;
+  sensitive_categories: SensitiveContentCategory[];
+  screenshot_blocked_reason: AmbientLocalPerceptionResult["screenshot_blocked_reason"];
   bypass_global_cooldown: boolean;
 }
 

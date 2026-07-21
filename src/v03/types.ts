@@ -40,6 +40,14 @@ export interface CalibrationInput {
   narrative: string;
 }
 
+export type CalibrationField = "current_position" | "available_hours_per_week" | "active_projects" | "growth_edges" | "desired_outcome";
+export interface CalibrationCorrectionInput {
+  values: Partial<{ current_position: string; available_hours_per_week: number; active_projects: string[]; growth_edges: string[]; desired_outcome: string }>;
+  accepted_unknowns: CalibrationField[];
+  reason: string;
+}
+export interface CalibrationAnswer { question: string; answer: string; }
+
 export interface SetupInput {
   current_position: string;
   available_hours_per_week: number;
@@ -100,6 +108,8 @@ export interface PendingDraft<T extends SetupProposal | WeekProposal | DayPropos
   draft_id: string;
   kind: "setup" | "week" | "day";
   created_at: string;
+  updated_at: string;
+  revision: number;
   project: string | null;
   original_objective: string | null;
   input: SetupInput | CalibrationInput | WeekInput | null;
@@ -214,6 +224,15 @@ export interface MemoryRecord {
   updated_at: string;
 }
 
+export type MemoryScope = "global" | "project";
+export interface MemoryRetrievalQuery {
+  text: string;
+  project?: string | null;
+  kinds?: MemoryRecord["kind"][];
+  maximum_sensitivity?: MemoryRecord["sensitivity"];
+  limit?: number;
+}
+
 export interface UsageSummary {
   invocation_count: number;
   prompt_characters: number;
@@ -227,9 +246,9 @@ export interface UsageSummary {
 }
 
 export interface RecoveryStatus {
-  schema_version: "0.3.2";
+  schema_version: "0.3.3";
   database_integrity: "ok";
-  schema_version_applied: "0.3.2";
+  schema_version_applied: "0.3.3";
   resumed_day_id: string | null;
   pending_draft_kind: "setup" | "week" | "day" | null;
   interrupted_invocations: number;
@@ -271,6 +290,7 @@ export interface OperatingSnapshot {
   pending_end_day: EndDayDraft | null;
   recent_context: ContextFrame[];
   context_diagnostics: AmbientContextDecision[];
+  retrieval_diagnostics: RetrievalDiagnostic[];
 }
 
 export interface V03Update {
@@ -344,10 +364,23 @@ export interface ContextFrame {
 
 export interface MemoryRetrievalResult {
   memory: MemoryRecord;
+  scope: MemoryScope;
+  project: string | null;
   score: number;
   lexical_score: number;
   vector_score: number;
   provenance: string;
+  retrieval_path: "fts_vector" | "fts_only" | "lexical_fallback";
+}
+
+export interface RetrievalDiagnostic {
+  retrieval_id: string;
+  context_id: string;
+  occurred_at: string;
+  project: string | null;
+  query_hash: string;
+  retrieval_path: MemoryRetrievalResult["retrieval_path"] | "none";
+  results: Array<{ memory_id: string; score: number; provenance: string }>;
 }
 
 export interface PlannerExecution<T> {
@@ -358,6 +391,7 @@ export interface PlannerExecution<T> {
 
 export interface V03Planner {
   draftSetup(input: SetupInput | CalibrationInput, mainGoal: string): Promise<PlannerExecution<SetupProposal>>;
+  refineSetup?(input: SetupInput | CalibrationInput, current: SetupProposal, answers: CalibrationAnswer[], mainGoal: string): Promise<PlannerExecution<SetupProposal>>;
   draftWeek(input: WeekInput, profile: OperatingProfile, context: string): Promise<PlannerExecution<WeekProposal>>;
   draftDay(project: string, objective: string, profile: OperatingProfile, context: string): Promise<PlannerExecution<DayProposal>>;
   draftEndDay?(narrative: string, day: DailyPlan, context: string): Promise<PlannerExecution<EndDayProposal>>;

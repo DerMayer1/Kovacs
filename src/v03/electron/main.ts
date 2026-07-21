@@ -9,6 +9,7 @@ import { ElectronWindowCapture, WindowsActiveWindowProbe } from "../../v02/elect
 import { LocalContextEngine } from "../../v032/context-engine.js";
 import { PerceptionCascade } from "../../v032/perception-cascade.js";
 import { WindowsPerception } from "../../v032/windows-perception.js";
+import { LocalSensitiveContentGuard } from "../../v033/sensitive-content.js";
 import type { ContextFrame } from "../types.js";
 import { loadV03Config } from "../config.js";
 import { createV03Contracts } from "../contracts.js";
@@ -17,7 +18,7 @@ import { CodexV03Planner } from "../planner.js";
 import { V03Store } from "../store.js";
 import { CHECKPOINT_STATUSES, DAY_OUTCOMES, EVIDENCE_SOURCES, INTERVENTION_FEEDBACK_KINDS } from "../types.js";
 
-if (process.platform !== "win32") throw new Error("Kovacs V0.3.2 pet currently supports Windows only.");
+if (process.platform !== "win32") throw new Error("Kovacs V0.3.3 pet currently supports Windows only.");
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const config = loadV03Config();
@@ -36,11 +37,16 @@ function text(value: unknown, label: string, maximum: number): string {
   return value.trim();
 }
 
+function textList(value: unknown, label: string, maximumItems = 20): string[] {
+  if (!Array.isArray(value) || value.length > maximumItems) throw new Error(`${label} must be an array with at most ${maximumItems} items.`);
+  return value.map((item, index) => text(item, `${label} ${index + 1}`, 500));
+}
+
 function createPet(): BrowserWindow {
   const window = new BrowserWindow({
     width: 460, height: 780, minWidth: 390, minHeight: 600, show: false, frame: false, transparent: true,
     alwaysOnTop: true, resizable: true, maximizable: false, fullscreenable: false, skipTaskbar: false,
-    backgroundColor: "#00000000", title: "Kovacs V0.3.2",
+    backgroundColor: "#00000000", title: "Kovacs V0.3.3",
     webPreferences: {
       preload: path.join(config.applicationRoot, "ui", "v0.3", "preload.cjs"),
       contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false,
@@ -66,9 +72,10 @@ async function bootstrap(): Promise<void> {
   store = await V03Store.create(config.databasePath, v03Contracts);
   const contextEngine = new LocalContextEngine();
   const perception = new WindowsPerception(path.join(config.applicationRoot, "scripts"));
-  const perceptionCascade = new PerceptionCascade(perception, contextEngine);
+  const perceptionCascade = new PerceptionCascade(perception, contextEngine, new LocalSensitiveContentGuard(config.restrictedTerms));
   let lastContext: ContextFrame | null = null;
   const workingFrames = new Map<string, { frame: ContextFrame; observedAt: number }>();
+  const retrievalByContext = new Map<string, { query: string; project: string | null; results: ReturnType<V03Store["searchMemories"]>; observedAt: number }>();
   let operating: V03Controller;
   const ambient = new AmbientController(service, ambientStore, settings, new WindowsActiveWindowProbe(), new ElectronWindowCapture(), {
     operatingContext: () => operating?.contextSummary() ?? "",
@@ -79,23 +86,32 @@ async function bootstrap(): Promise<void> {
         previous: lastContext, capture });
       const cutoff = Date.now() - 10 * 60_000;
       for (const [contextId, entry] of workingFrames) if (entry.observedAt < cutoff) workingFrames.delete(contextId);
+      for (const [contextId, entry] of retrievalByContext) if (entry.observedAt < cutoff) retrievalByContext.delete(contextId);
       workingFrames.set(result.frame.context_id, { frame: result.frame, observedAt: Date.now() });
       lastContext = result.frame;
       const query = `${result.frame.activity} ${result.frame.visible_intent} ${result.frame.artifact ?? ""} ${day?.objective ?? ""}`;
-      const memories = store?.searchMemories(query, 3) ?? [];
+      const memories = store?.searchMemories({ text: query, project: day?.project ?? null,
+        kinds: ["routine", "context", "pattern", "lesson"], maximum_sensitivity: "internal", limit: 3 }) ?? [];
+      retrievalByContext.set(result.frame.context_id, { query, project: day?.project ?? null, results: memories, observedAt: Date.now() });
       return { context: `${contextEngine.summarize(result.frame, memories)}\nPerception path: ${result.capture_used ? result.screenshot ? "UIA -> OCR -> screenshot" : "UIA -> OCR" : "UIA only"}${result.failures.length ? `\nLocal perception limitations: ${result.failures.join(" | ")}` : ""}`,
         context_id: result.frame.context_id, occurred_at: result.frame.occurred_at,
         fingerprint: result.fingerprint, semantic_fingerprint: result.semantic_fingerprint,
         confidence: result.frame.confidence, sufficient: contextEngine.isSufficient(result.frame), conflicting: result.conflicting,
-        deterministic_trigger: result.deterministic_trigger, changed_fields: result.frame.changed_fields,
+        deterministic_trigger: result.deterministic_trigger, prompt_injection_detected: result.prompt_injection_detected,
+        sensitive_content_detected: result.sensitive_content_detected, sensitive_categories: result.sensitive_categories,
+        screenshot_blocked_reason: result.screenshot_blocked_reason, changed_fields: result.frame.changed_fields,
         screenshot: result.screenshot, capture_used: result.capture_used, ocr_used: result.ocr_used };
     },
-    onContextDecision: (decision) => { store?.recordContextDecision(decision); },
+    onContextDecision: (decision) => {
+      store?.recordContextDecision(decision);
+      const retrieval = retrievalByContext.get(decision.context_id);
+      if (retrieval && decision.reason !== "unchanged") store?.recordRetrievalDiagnostic(decision.context_id, retrieval.project, retrieval.query, retrieval.results);
+    },
     onContextEvent: (event) => {
       const entry = workingFrames.get(event.context_id);
       if (entry && Date.now() - entry.observedAt <= 10 * 60_000) store?.recordContextFrame(entry.frame, event);
     },
-    onWorkingContextCleared: () => { workingFrames.clear(); lastContext = null; },
+    onWorkingContextCleared: () => { workingFrames.clear(); retrievalByContext.clear(); lastContext = null; },
     onReasoningComplete: (telemetry) => operating?.recordAmbientInvocation(telemetry),
   });
   operating = new V03Controller(ambient, store, new CodexV03Planner(config, v03Contracts));
@@ -111,6 +127,25 @@ async function bootstrap(): Promise<void> {
   });
   ipcMain.handle("v03:setup:confirm", (_event, value: unknown) => controller.confirmSetup(text(payload(value, "setup confirmation").draft_id, "Draft identifier", 100)));
   ipcMain.handle("v03:setup:revise", (_event, value: unknown) => { const input = payload(value, "setup revision"); return controller.reviseSetupDraft(text(input.draft_id, "Draft identifier", 100), payload(input.proposal, "setup proposal") as never, text(input.reason, "Revision reason", 1000)); });
+  ipcMain.handle("v03:setup:correct", (_event, value: unknown) => {
+    const input = payload(value, "calibration correction"), values = payload(input.values ?? {}, "calibration values");
+    const corrected: Record<string, unknown> = {};
+    if (values.current_position !== undefined) corrected.current_position = text(values.current_position, "Current position", 1000);
+    if (values.available_hours_per_week !== undefined) corrected.available_hours_per_week = Number(values.available_hours_per_week);
+    if (values.active_projects !== undefined) corrected.active_projects = textList(values.active_projects, "Active projects");
+    if (values.growth_edges !== undefined) corrected.growth_edges = textList(values.growth_edges, "Growth edges");
+    if (values.desired_outcome !== undefined) corrected.desired_outcome = text(values.desired_outcome, "Desired outcome", 2000);
+    return controller.correctSetupDraft(text(input.draft_id, "Draft identifier", 100), { values: corrected,
+      accepted_unknowns: textList(input.accepted_unknowns ?? [], "Accepted unknowns", 5) as never,
+      reason: text(input.reason, "Correction reason", 1000) });
+  });
+  ipcMain.handle("v03:setup:refine", (_event, value: unknown) => {
+    const input = payload(value, "calibration refinement");
+    if (!Array.isArray(input.answers) || input.answers.length < 1 || input.answers.length > 2) throw new Error("One or two clarification answers are required.");
+    const answers = input.answers.map((item, index) => { const answer = payload(item, `clarification answer ${index + 1}`); return {
+      question: text(answer.question, "Clarification question", 1000), answer: text(answer.answer, "Clarification answer", 2000) }; });
+    return controller.refineSetupDraft(text(input.draft_id, "Draft identifier", 100), answers);
+  });
   ipcMain.handle("v03:week:draft", (_event, value: unknown) => {
     const input = payload(value, "week");
     return controller.draftWeek({ priorities: text(input.priorities, "Weekly priorities", 2000), constraints: text(input.constraints, "Weekly constraints", 2000) });

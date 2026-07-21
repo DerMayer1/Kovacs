@@ -6,6 +6,8 @@ import type { AmbientReasoningTelemetry, AmbientState, AmbientStatus } from "../
 import type { V03Store } from "./store.js";
 import type {
   CheckpointCompletionInput,
+  CalibrationAnswer,
+  CalibrationCorrectionInput,
   CalibrationInput,
   CheckpointTransitionInput,
   DayProposal,
@@ -38,7 +40,8 @@ export class V03Controller {
     this.ambient.onUpdate((update) => {
       if (update.response?.memory_candidates.length) {
         const ambient = this.ambient.getState();
-        this.store.ingestMemoryCandidates(update.response.memory_candidates, this.store.getActiveDay()?.day_id ?? null, ambient?.session_id ?? null);
+        const activeDay = this.store.getActiveDay();
+        this.store.ingestMemoryCandidates(update.response.memory_candidates, activeDay?.day_id ?? null, ambient?.session_id ?? null, activeDay?.project ?? null);
       }
       this.emit(update.message, update.response);
     });
@@ -188,6 +191,51 @@ export class V03Controller {
   reviseSetupDraft(draftId: string, proposal: SetupProposal, reason: string): OperatingSnapshot {
     this.store.reviseSetupDraft(clean(draftId, "Draft identifier", 100), proposal, clean(reason, "Revision reason", 1000));
     this.emit("Setup proposal revised locally and still waiting for confirmation."); return this.store.snapshot();
+  }
+
+  correctSetupDraft(draftId: string, input: CalibrationCorrectionInput): OperatingSnapshot {
+    const draft = this.store.snapshot().pending_setup;
+    if (!draft || draft.draft_id !== clean(draftId, "Draft identifier", 100) || !draft.proposal.interpreted_profile) throw new Error("The calibration proposal no longer exists.");
+    const reason = clean(input.reason, "Correction reason", 1000), proposal: SetupProposal = structuredClone(draft.proposal);
+    const profile = proposal.interpreted_profile!;
+    const confirm = <T>(value: T | null, rationale: string) => ({ value, source: "confirmed" as const, confidence: 1, rationale });
+    if (input.values.current_position !== undefined) profile.current_position = confirm(clean(input.values.current_position, "Current position", 1000), reason);
+    if (input.values.available_hours_per_week !== undefined) {
+      const hours = Number(input.values.available_hours_per_week); if (!Number.isFinite(hours) || hours < 1 || hours > 100) throw new Error("Available hours must be between 1 and 100 per week.");
+      profile.available_hours_per_week = confirm(hours, reason);
+    }
+    if (input.values.active_projects !== undefined) profile.active_projects = confirm(input.values.active_projects.map((item) => clean(item, "Active project", 500)).slice(0, 20), reason);
+    if (input.values.growth_edges !== undefined) profile.growth_edges = confirm(input.values.growth_edges.map((item) => clean(item, "Growth edge", 500)).slice(0, 20), reason);
+    if (input.values.desired_outcome !== undefined) profile.desired_outcome = confirm(clean(input.values.desired_outcome, "Desired outcome", 2000), reason);
+    for (const field of input.accepted_unknowns) {
+      if (!["current_position", "available_hours_per_week", "active_projects", "growth_edges", "desired_outcome"].includes(field)) throw new Error("Invalid accepted-unknown calibration field.");
+      (profile as unknown as Record<string, unknown>)[field] = confirm(null, "The learner explicitly accepted this value as unknown for the current mission.");
+    }
+    this.store.reviseSetupDraft(draft.draft_id, proposal, reason);
+    this.emit("Calibration facts corrected locally. No Codex call was used.");
+    return this.store.snapshot();
+  }
+
+  async refineSetupDraft(draftId: string, answersInput: CalibrationAnswer[]): Promise<OperatingSnapshot> {
+    const draft = this.store.snapshot().pending_setup;
+    if (!draft || draft.draft_id !== clean(draftId, "Draft identifier", 100) || !draft.input || !draft.proposal.interpreted_profile) throw new Error("The calibration proposal no longer exists.");
+    if (!this.planner.refineSetup) throw new Error("The configured planner does not support calibration refinement.");
+    const answers = answersInput.slice(0, 2).map((item) => ({ question: clean(item.question, "Clarification question", 1000), answer: clean(item.answer, "Clarification answer", 2000) }));
+    if (!answers.length) throw new Error("At least one clarification answer is required.");
+    return this.exclusive(async () => {
+      const started = Date.now(), invocationId = this.store.beginInvocation({ day_id: null, reason: "refine_90_day_mission", urgency: "important", image_attached: false });
+      try {
+        const execution = await this.planner.refineSetup!(draft.input as SetupInput | CalibrationInput, draft.proposal, answers, MAIN_GOAL);
+        this.store.finishInvocation(invocationId, { duration_ms: execution.duration_ms, prompt_characters: execution.prompt_characters,
+          response_characters: JSON.stringify(execution.proposal).length, cached: false, outcome: "proposal", response_used: true });
+        this.store.reviseSetupDraft(draft.draft_id, execution.proposal, "Learner answered clarification questions");
+        this.emit("Calibration reinterpreted from your answers. Review the new revision before confirming.");
+        return this.store.snapshot();
+      } catch (error) {
+        this.store.finishInvocation(invocationId, { duration_ms: Date.now() - started, prompt_characters: 0, response_characters: 0, cached: false, outcome: "failed", response_used: false });
+        throw error;
+      }
+    });
   }
 
   reviseWeekDraft(draftId: string, proposal: WeekProposal, reason: string): OperatingSnapshot {
