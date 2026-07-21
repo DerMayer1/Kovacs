@@ -57,13 +57,43 @@ export interface CapturedFrame {
 }
 
 export interface AmbientLocalPerceptionResult {
+  context_id: string;
+  occurred_at: string;
   context: string;
   fingerprint: string;
+  semantic_fingerprint: string;
   confidence: number;
   sufficient: boolean;
+  conflicting: boolean;
+  deterministic_trigger: boolean;
+  changed_fields: string[];
   screenshot: Buffer | null;
   capture_used: boolean;
   ocr_used: boolean;
+}
+
+export type AmbientContextDecisionKind = "call" | "silence";
+export interface AmbientContextDecision {
+  occurred_at: string;
+  context_id: string;
+  application: string;
+  confidence: number;
+  perception_path: "uia" | "uia_ocr" | "uia_ocr_screenshot";
+  decision: AmbientContextDecisionKind;
+  reason: "manual" | "private_or_unauthorized" | "conflicting_signals" | "low_confidence" | "medium_confidence" | "awaiting_stability" | "weak_delta" | "same_context_cooldown" | "suppressed_by_feedback" | "stable_strong_delta" | "deterministic_trigger" | "unchanged";
+  changed_fields: string[];
+  fingerprint: string;
+  semantic_fingerprint: string;
+  image_attached: boolean;
+  bypass_global_cooldown: boolean;
+}
+
+export interface AmbientContextEvent {
+  kind: "intervention" | "feedback" | "checkpoint" | "evidence" | "end_day";
+  occurred_at: string;
+  context_id: string;
+  reference_id: string | null;
+  retention_class: "event" | "evidence";
 }
 
 export interface WindowProbe { getActiveWindow(): Promise<ActiveWindowInfo | null>; }
@@ -89,5 +119,8 @@ export interface AmbientReasoningTelemetry {
 export interface AmbientControllerOptions {
   operatingContext?: () => string | Promise<string>;
   localPerception?: (window: ActiveWindowInfo, capture: () => Promise<CapturedFrame | null>) => AmbientLocalPerceptionResult | Promise<AmbientLocalPerceptionResult>;
+  onContextDecision?: (decision: AmbientContextDecision) => void | Promise<void>;
+  onContextEvent?: (event: AmbientContextEvent) => void | Promise<void>;
+  onWorkingContextCleared?: () => void | Promise<void>;
   onReasoningComplete?: (telemetry: AmbientReasoningTelemetry) => void | Promise<void>;
 }

@@ -14,9 +14,12 @@ export interface PerceptionCascadeInput {
 export interface PerceptionCascadeResult {
   frame: ContextFrame;
   fingerprint: string;
+  semantic_fingerprint: string;
   screenshot: Buffer | null;
   capture_used: boolean;
   ocr_used: boolean;
+  conflicting: boolean;
+  deterministic_trigger: boolean;
   failures: Array<"accessibility_unavailable" | "ocr_unavailable">;
 }
 
@@ -29,7 +32,9 @@ export class PerceptionCascade {
     let frame = this.context.analyze({ application: input.window.application, windowTitle: input.window.title,
       project: input.project, activeCheckpoint: input.activeCheckpoint, accessibilityText: accessibility.text,
       ocrText: "", previous: input.previous });
-    if (this.context.isSufficient(frame)) return { frame, fingerprint: this.context.fingerprint(frame), screenshot: null, capture_used: false, ocr_used: false, failures };
+    const accessibilityTrigger = this.context.hasDeterministicTrigger(accessibility.text, "");
+    if (this.context.isSufficient(frame)) return { frame, fingerprint: this.context.fingerprint(frame), semantic_fingerprint: this.context.semanticFingerprint(frame),
+      screenshot: null, capture_used: false, ocr_used: false, conflicting: this.context.hasConflict(frame), deterministic_trigger: accessibilityTrigger, failures };
 
     const captured = await input.capture();
     if (!captured) throw new Error("Local perception could not capture the authorized window for OCR fallback.");
@@ -38,8 +43,9 @@ export class PerceptionCascade {
     frame = this.context.analyze({ application: input.window.application, windowTitle: input.window.title,
       project: input.project, activeCheckpoint: input.activeCheckpoint, accessibilityText: accessibility.text,
       ocrText: ocr.text, previous: input.previous });
-    const sufficient = this.context.isSufficient(frame);
-    return { frame, fingerprint: this.context.fingerprint(frame), screenshot: sufficient ? null : captured.png,
-      capture_used: true, ocr_used: true, failures };
+    const sufficient = this.context.isSufficient(frame), deterministicTrigger = this.context.hasDeterministicTrigger(accessibility.text, ocr.text);
+    return { frame, fingerprint: this.context.fingerprint(frame), semantic_fingerprint: this.context.semanticFingerprint(frame),
+      screenshot: sufficient && !(deterministicTrigger && frame.confidence < 0.8) ? null : captured.png,
+      capture_used: true, ocr_used: true, conflicting: this.context.hasConflict(frame), deterministic_trigger: deterministicTrigger, failures };
   }
 }

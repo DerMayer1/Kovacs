@@ -82,7 +82,10 @@ async function bootstrap(): Promise<void> {
       const query = `${result.frame.activity} ${result.frame.visible_intent} ${result.frame.artifact ?? ""} ${day?.objective ?? ""}`;
       const memories = store?.searchMemories(query, 3) ?? [];
       return { context: `${contextEngine.summarize(result.frame, memories)}\nPerception path: ${result.capture_used ? result.screenshot ? "UIA -> OCR -> screenshot" : "UIA -> OCR" : "UIA only"}${result.failures.length ? `\nLocal perception limitations: ${result.failures.join(" | ")}` : ""}`,
-        fingerprint: result.fingerprint, confidence: result.frame.confidence, sufficient: contextEngine.isSufficient(result.frame),
+        context_id: result.frame.context_id, occurred_at: result.frame.occurred_at,
+        fingerprint: result.fingerprint, semantic_fingerprint: result.semantic_fingerprint,
+        confidence: result.frame.confidence, sufficient: contextEngine.isSufficient(result.frame), conflicting: result.conflicting,
+        deterministic_trigger: result.deterministic_trigger, changed_fields: result.frame.changed_fields,
         screenshot: result.screenshot, capture_used: result.capture_used, ocr_used: result.ocr_used };
     },
     onReasoningComplete: (telemetry) => operating?.recordAmbientInvocation(telemetry),

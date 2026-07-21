@@ -36,12 +36,12 @@ test("sufficient UIA context performs zero capture, zero OCR, and zero screensho
   assert.equal(result.ocr_used, false); assert.equal(result.screenshot, null);
 });
 
-test("insufficient UIA uses OCR locally but withholds a sufficient screenshot from Codex", async () => {
+test("a deterministic OCR failure may escalate the already captured frame to Codex", async () => {
   const adapter = new FakePerception({ text: "", failure: "accessibility_unavailable" }, { text: "failing test assertion in controller.ts", failure: null });
   const cascade = new PerceptionCascade(adapter, new LocalContextEngine()); let captures = 0;
   const result = await cascade.observe(cascadeInput(async () => { adapter.events.push("capture"); captures += 1; return captured; }));
   assert.deepEqual(adapter.events, ["uia", "capture", "ocr"]); assert.equal(captures, 1); assert.equal(result.capture_used, true);
-  assert.equal(result.ocr_used, true); assert.equal(result.screenshot, null);
+  assert.equal(result.ocr_used, true); assert.deepEqual(result.screenshot, captured.png);
 });
 
 test("screenshot is returned only after both UIA and OCR remain insufficient", async () => {
@@ -70,12 +70,18 @@ class FakeService {
 test("AmbientController does not capture or attach an image when local perception is sufficient", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "kovacs-lazy-ambient-")); t.after(() => rm(directory, { recursive: true, force: true }));
   const project = path.join(directory, "project"); await mkdir(project);
-  const contracts = await createAmbientContracts(path.join(root, "contracts")), service = new FakeService(); let captures = 0;
+  const contracts = await createAmbientContracts(path.join(root, "contracts")), service = new FakeService(); let captures = 0, contextEvents = 0, clears = 0;
   const controller = new AmbientController(service as unknown as KovacsService, new AmbientStateStore(path.join(directory, "ambient"), contracts),
     { ...defaultAmbientSettings(), automatic_interventions: true }, { getActiveWindow: async () => window },
-    { capture: async () => { captures += 1; return captured; } }, { localPerception: async () => ({ context: "Sufficient UIA context", fingerprint: "a".repeat(64), confidence: 0.8, sufficient: true, screenshot: null, capture_used: false, ocr_used: false }) });
+    { capture: async () => { captures += 1; return captured; } }, { localPerception: async () => ({
+      context_id: "ctx_lazy", occurred_at: new Date().toISOString(), context: "Sufficient UIA context",
+      fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), confidence: 0.8, sufficient: true,
+      conflicting: false, deterministic_trigger: true, changed_fields: ["activity"], screenshot: null,
+      capture_used: false, ocr_used: false,
+    }), onContextEvent: () => { contextEvents += 1; }, onWorkingContextCleared: () => { clears += 1; } });
   await controller.initialize(); await controller.startDay(project, "Prove lazy perception"); await controller.tick();
   assert.equal(captures, 0); assert.equal(service.inputs.length, 1); assert.equal(service.inputs[0]!.imagePaths, undefined);
   assert.equal(controller.getState()?.events.at(-1)?.frame_attached, false);
   await controller.tick(); assert.equal(service.inputs.length, 1);
+  assert.equal(contextEvents, 1); await controller.setStatus("paused"); assert.equal(clears, 2);
 });

@@ -6,7 +6,8 @@ import type { KovacsService } from "../v01/service.js";
 import { authorizeWindow } from "./permissions.js";
 import { isMeaningfulFrameChange } from "./change-detector.js";
 import { automaticInterventionAllowed, classifyUrgency } from "./policy.js";
-import type { AmbientControllerOptions, AmbientEvent, AmbientSettings, AmbientState, AmbientStatus, AmbientUpdate, ActiveWindowInfo, FrameCapture, WindowProbe } from "./types.js";
+import { AmbientContextDecisionEngine } from "./context-decision.js";
+import type { AmbientContextEvent, AmbientControllerOptions, AmbientEvent, AmbientLocalPerceptionResult, AmbientSettings, AmbientState, AmbientStatus, AmbientUpdate, ActiveWindowInfo, FrameCapture, WindowProbe } from "./types.js";
 import type { AmbientStateStore } from "./state-store.js";
 
 const id = (prefix: "day" | "amb") => `${prefix}_${randomUUID().replaceAll("-", "")}`;
@@ -14,7 +15,9 @@ const id = (prefix: "day" | "amb") => `${prefix}_${randomUUID().replaceAll("-", 
 export class AmbientController {
   private state: AmbientState | null = null;
   private previousFrame: Buffer | null = null;
-  private previousContextFingerprint: string | null = null;
+  private readonly contextDecisions = new AmbientContextDecisionEngine();
+  private currentPerception: AmbientLocalPerceptionResult | null = null;
+  private readonly requestContextIds = new Map<string, string>();
   private busy = false;
   private blockedSince: number | null = null;
   private focusDriftReported = false;
@@ -59,7 +62,9 @@ export class AmbientController {
     if (process.platform !== "win32") throw new Error("Kovacs V0.2 screen observation is Windows-only.");
     if (!objective.trim()) throw new Error("Today's objective cannot be empty.");
     const session = await this.service.start(project, `Daily objective: ${objective.trim()}`, "training");
-    this.previousFrame = null; this.previousContextFingerprint = null; this.lastWindowKey = null; this.lastAuthorizedWindow = null;
+    this.previousFrame = null; this.lastWindowKey = null; this.lastAuthorizedWindow = null;
+    this.contextDecisions.reset(); this.currentPerception = null; this.requestContextIds.clear();
+    await this.options.onWorkingContextCleared?.();
     const now = new Date().toISOString();
     this.state = {
       schema_version: "0.2.0", day_id: id("day"), status: "observing", main_goal: this.settings.main_goal,
@@ -72,7 +77,9 @@ export class AmbientController {
 
   async setStatus(status: Extract<AmbientStatus, "observing" | "paused" | "private">): Promise<AmbientState> {
     if (!this.state || this.state.status === "ended") throw new Error("No active day exists.");
-    this.state.status = status; this.previousFrame = null; this.previousContextFingerprint = null; this.blockedSince = null; this.focusDriftReported = false;
+    this.state.status = status; this.previousFrame = null; this.blockedSince = null; this.focusDriftReported = false;
+    this.contextDecisions.reset(); this.currentPerception = null; this.requestContextIds.clear();
+    await this.options.onWorkingContextCleared?.();
     await this.store.append(this.state, this.event("status_changed", `Observation status changed to ${status}.`));
     this.emit(`Kovacs is ${status}.`); return this.state;
   }
@@ -120,14 +127,14 @@ export class AmbientController {
         return frame;
       })());
       if (!perception.fingerprint.trim()) throw new Error("Local perception returned an empty fingerprint.");
-      const changed = perception.fingerprint !== this.previousContextFingerprint;
-      this.previousContextFingerprint = perception.fingerprint;
-      if (!changed) { await this.store.saveState(this.state); return; }
+      this.currentPerception = perception;
       const urgency = classifyUrgency(window, false);
-      await this.store.append(this.state, this.event("screen_changed", "A meaningful authorized context change was detected locally.", { urgency, application: window.application, window_title: window.title }));
-      if (automaticInterventionAllowed(this.settings, Date.now(), this.state.last_intervention_at, urgency, this.busy)) {
-        await this.intervene(window, perception.screenshot, false, urgency, perception.context);
-      }
+      const decision = this.contextDecisions.evaluate(perception, window, false, urgency);
+      await this.options.onContextDecision?.(decision);
+      if (decision.reason !== "unchanged") await this.store.append(this.state, this.event("screen_changed", `Local context decision: ${decision.decision} (${decision.reason}).`, { urgency, application: window.application, window_title: window.title }));
+      if (decision.decision === "silence") { await this.store.saveState(this.state); return; }
+      const scheduleAllowed = decision.bypass_global_cooldown || automaticInterventionAllowed(this.settings, Date.now(), this.state.last_intervention_at, urgency, this.busy);
+      if (scheduleAllowed) await this.intervene(window, perception.screenshot, false, urgency, perception.context, perception);
       return;
     }
     const frame = await this.frames.capture(window); if (!frame) return;
@@ -160,15 +167,18 @@ export class AmbientController {
         if (frame && this.state) this.state.last_capture_at = new Date().toISOString();
         return frame;
       })());
-      await this.intervene(window, perception.screenshot, true, urgency, perception.context);
+      this.currentPerception = perception;
+      const decision = this.contextDecisions.evaluate(perception, window, true, urgency);
+      await this.options.onContextDecision?.(decision);
+      await this.intervene(window, perception.screenshot, true, urgency, perception.context, perception);
       return;
     }
     const frame = await this.frames.capture(window); if (!frame) throw new Error("The active window could not be captured.");
     this.state.last_capture_at = new Date().toISOString();
-    await this.intervene(window, frame.png, true, urgency, "");
+    await this.intervene(window, frame.png, true, urgency, "", null);
   }
 
-  private async intervene(window: ActiveWindowInfo, png: Buffer | null, manual: boolean, urgency: AmbientEvent["urgency"], perceivedContext: string): Promise<void> {
+  private async intervene(window: ActiveWindowInfo, png: Buffer | null, manual: boolean, urgency: AmbientEvent["urgency"], perceivedContext: string, perception: AmbientLocalPerceptionResult | null = null): Promise<void> {
     if (!this.state) return;
     this.busy = true;
     const temporary = png ? await mkdtemp(path.join(os.tmpdir(), "kovacs-observation-")) : null;
@@ -184,6 +194,11 @@ export class AmbientController {
         ...(imagePath ? { imagePaths: [imagePath] } : {}),
       });
       this.state.last_intervention_at = new Date().toISOString();
+      if (perception) {
+        this.contextDecisions.recordIntervention(result.response.request_id, perception);
+        this.requestContextIds.set(result.response.request_id, perception.context_id);
+        await this.options.onContextEvent?.({ kind: "intervention", occurred_at: new Date().toISOString(), context_id: perception.context_id, reference_id: result.response.request_id, retention_class: "event" });
+      }
       await this.store.append(this.state, this.event("intervention", "A validated coaching intervention was displayed.", { urgency, application: window.application, window_title: window.title, frame_attached: Boolean(imagePath), intervention_request_id: result.response.request_id }));
       await this.options.onReasoningComplete?.({
         reason: manual ? "manual_observation" : "automatic_observation",
@@ -209,6 +224,18 @@ export class AmbientController {
     }
   }
 
+  async recordContextFeedback(requestId: string, kind: string): Promise<void> {
+    this.contextDecisions.recordFeedback(requestId, kind);
+    const contextId = this.requestContextIds.get(requestId); if (!contextId) return;
+    await this.options.onContextEvent?.({ kind: "feedback", occurred_at: new Date().toISOString(), context_id: contextId, reference_id: requestId, retention_class: "event" });
+  }
+
+  async recordContextMilestone(kind: Extract<AmbientContextEvent["kind"], "checkpoint" | "evidence" | "end_day">, referenceId: string | null, retentionClass: AmbientContextEvent["retention_class"] = "event"): Promise<void> {
+    const perception = this.currentPerception;
+    if (!perception || Date.now() - new Date(perception.occurred_at).getTime() > 10 * 60_000) return;
+    await this.options.onContextEvent?.({ kind, occurred_at: new Date().toISOString(), context_id: perception.context_id, reference_id: referenceId, retention_class: retentionClass });
+  }
+
   async endDay(operatingNotes = ""): Promise<void> {
     if (!this.state || this.state.status === "ended") throw new Error("No active day exists.");
     this.state.status = "paused";
@@ -230,7 +257,10 @@ export class AmbientController {
       image_attached: false, cached: result.cached, outcome: "displayed",
     });
     this.state.status = "ended"; this.state.ended_at = new Date().toISOString();
+    await this.recordContextMilestone("end_day", result.response.request_id);
     await this.store.append(this.state, this.event("day_ended", "Active day ended with a validated debrief.", { intervention_request_id: result.response.request_id }));
+    this.contextDecisions.reset(); this.currentPerception = null; this.requestContextIds.clear();
+    await this.options.onWorkingContextCleared?.();
     this.emit(result.response.intervention.message, result.response);
   }
 }

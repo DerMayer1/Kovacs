@@ -34,7 +34,7 @@ export class LocalContextEngine {
     const accessibility = normalize(input.accessibilityText).slice(0, 12_000);
     const ocr = normalize(input.ocrText).slice(0, 12_000);
     const transient = normalize(`${input.windowTitle} ${accessibility} ${ocr}`);
-    const classified = classify(transient);
+    const classified = classify(transient), accessibilityClass = classify(accessibility), ocrClass = classify(ocr);
     const artifact = filename(transient);
     const sources: ContextFrame["signal_sources"] = ["active_window", "operating_state"];
     if (accessibility) sources.push("accessibility");
@@ -42,7 +42,9 @@ export class LocalContextEngine {
     const ambiguity: string[] = [];
     if (!accessibility && !ocr) ambiguity.push("No local text signal was available; context is based on active-window metadata and operating state.");
     if (!artifact) ambiguity.push("No specific artifact was confidently identified.");
-    const confidence = Math.min(0.95, 0.35 + (accessibility ? 0.25 : 0) + (ocr ? 0.2 : 0) + (input.activeCheckpoint ? 0.1 : 0));
+    const conflicting = Boolean(accessibility && ocr && accessibilityClass.activity !== "general_work" && ocrClass.activity !== "general_work" && accessibilityClass.activity !== ocrClass.activity);
+    if (conflicting) ambiguity.push(`Conflicting local signals: accessibility suggests ${accessibilityClass.activity} while OCR suggests ${ocrClass.activity}.`);
+    const confidence = Math.max(0.1, Math.min(0.95, 0.35 + (accessibility ? 0.38 : 0) + (ocr ? 0.25 : 0) + (input.activeCheckpoint ? 0.1 : 0) - (conflicting ? 0.25 : 0)));
     const current = { application: input.application, project: input.project, activity: classified.activity,
       artifact, visible_intent: classified.intent, active_checkpoint: input.activeCheckpoint };
     const changedFields = Object.entries(current).filter(([key, value]) => input.previous ? input.previous[key as keyof ContextFrame] !== value : true).map(([key]) => key);
@@ -57,7 +59,7 @@ export class LocalContextEngine {
   isSufficient(frame: ContextFrame): boolean {
     if (frame.privacy_classification !== "authorized" || !frame.text_digest) return false;
     const accessibility = frame.signal_sources.includes("accessibility"), ocr = frame.signal_sources.includes("ocr");
-    const minimumConfidence = ocr && !accessibility ? 0.65 : 0.7;
+    const minimumConfidence = ocr && !accessibility ? 0.7 : 0.8;
     if (frame.confidence + Number.EPSILON < minimumConfidence) return false;
     return frame.activity !== "general_work" || frame.artifact !== null;
   }
@@ -67,6 +69,18 @@ export class LocalContextEngine {
       activity: frame.activity, artifact: frame.artifact, visible_intent: frame.visible_intent,
       active_checkpoint: frame.active_checkpoint, privacy_classification: frame.privacy_classification,
       text_digest: frame.text_digest }), "utf8").digest("hex");
+  }
+
+  semanticFingerprint(frame: ContextFrame): string {
+    return createHash("sha256").update(JSON.stringify({ application: frame.application, project: frame.project,
+      activity: frame.activity, artifact: frame.artifact, visible_intent: frame.visible_intent,
+      active_checkpoint: frame.active_checkpoint, privacy_classification: frame.privacy_classification }), "utf8").digest("hex");
+  }
+
+  hasConflict(frame: ContextFrame): boolean { return frame.ambiguity.some((item) => item.startsWith("Conflicting local signals:")); }
+
+  hasDeterministicTrigger(accessibilityText: string, ocrText: string): boolean {
+    return /\b(error|exception|traceback|assert(?:ion)? failed|test(?:s)? failed|failing test|build failed|fatal)\b/i.test(`${accessibilityText}\n${ocrText}`);
   }
 
   summarize(frame: ContextFrame, memories: MemoryRetrievalResult[]): string {
