@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Kovacs V0.3.1</title>
+  <title>Kovacs V0.3.2</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell" data-state="idle">
     <header class="dragbar">
-      <div class="wordmark">KOVACS <span>V0.3.1</span></div>
+      <div class="wordmark">KOVACS <span>V0.3.2</span></div>
       <div class="header-actions">
         <div class="capture-state"><i></i><span id="state-label">IDLE</span></div>
         <button id="close" class="window-close" aria-label="Close Kovacs"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
@@ -33,14 +33,11 @@
     <div class="viewport">
       <div id="recovery" class="recovery hidden"></div>
       <section id="setup-view" class="view">
-        <div class="section-heading"><span>INITIAL CALIBRATION</span><strong>Build the first 90-day mission</strong><p>Competencies begin unverified. After approval, an authorized screenshot and window title may be sent transiently to Codex for reasoning; neither is retained by Kovacs. Kovacs never acts for you.</p></div>
+        <div class="section-heading"><span>INITIAL CALIBRATION</span><strong>Tell Kovacs where you are</strong><p>Write naturally. Kovacs will extract your reality, identify assumptions, and propose a 90-day operating system for your approval. Nothing becomes fact before you confirm it.</p></div>
         <div id="setup-form" class="form-stack">
-          <label for="current-position">CURRENT POSITION</label><textarea id="current-position" rows="2" maxlength="1000" placeholder="Your current role, experience, and working reality"></textarea>
-          <label for="available-hours">HOURS AVAILABLE / WEEK</label><input id="available-hours" type="number" min="1" max="100" value="20">
-          <label for="active-projects">ACTIVE PROJECTS</label><textarea id="active-projects" rows="2" maxlength="2000" placeholder="Projects that can produce real evidence"></textarea>
-          <label for="weaknesses">GROWTH EDGES</label><textarea id="weaknesses" rows="2" maxlength="2000" placeholder="Where your judgment or execution currently breaks down"></textarea>
-          <label for="desired-outcome">DESIRED 90-DAY OUTCOME</label><textarea id="desired-outcome" rows="3" maxlength="2000" placeholder="What must be demonstrably different in 90 days?"></textarea>
-          <button id="draft-setup" class="primary">DRAFT OPERATING SYSTEM</button>
+          <label for="setup-narrative">YOUR SITUATION, IN YOUR WORDS</label><textarea id="setup-narrative" rows="9" maxlength="6000" placeholder="Example: I am a backend engineer with three years of experience. I can dedicate about 15 hours a week. I am building Kovacs and want to become much stronger at AI systems design, technical judgment, and communicating decisions. In 90 days I want evidence that I can lead a serious AI product end to end."></textarea>
+          <p class="field-note">Useful signals: current work, time available, active projects, recurring difficulties, and what you want to prove. You do not need to format them.</p>
+          <button id="draft-setup" class="primary">INTERPRET &amp; PROPOSE</button>
         </div>
         <div id="setup-proposal" class="proposal hidden"></div>
       </section>
@@ -48,9 +45,9 @@
       <section id="today-view" class="view hidden">
         <div id="hierarchy" class="hierarchy"></div>
         <div id="day-start" class="form-stack">
-          <label for="project">PRIMARY PROJECT</label><input id="project" autocomplete="off" spellcheck="false">
-          <label for="objective">TODAY'S OBJECTIVE</label><textarea id="objective" rows="3" maxlength="1000" placeholder="What must be true by the end of today?"></textarea>
-          <button id="draft-day" class="primary">DRAFT TODAY'S PLAN</button>
+          <label for="objective">WHAT DO YOU NEED TO MOVE TODAY?</label><textarea id="objective" rows="5" maxlength="1000" placeholder="Write the situation or desired outcome naturally. Kovacs will turn it into an objective, success evidence, and ordered checkpoints."></textarea>
+          <details class="week-control"><summary>PROJECT LOCATION</summary><label for="project">LOCAL PROJECT</label><input id="project" autocomplete="off" spellcheck="false"></details>
+          <button id="draft-day" class="primary">STRUCTURE MY DAY</button>
           <details class="week-control"><summary>START A NEW ROLLING WEEK</summary>
             <label for="week-priorities">PRIORITIES</label><textarea id="week-priorities" rows="2" maxlength="2000" placeholder="What matters most this week?"></textarea>
             <label for="week-constraints">CONSTRAINTS</label><textarea id="week-constraints" rows="2" maxlength="2000" placeholder="Time, dependencies, deadlines"></textarea>
@@ -79,14 +76,12 @@
             <div class="form-actions"><button type="submit" class="primary">RECORD EVIDENCE</button><button type="button" id="cancel-checkpoint">CANCEL</button></div>
           </form>
           <form id="end-form" class="evidence-form hidden">
-            <span>END-OF-DAY EVIDENCE</span>
-            <select id="day-outcome"><option value="achieved">Achieved</option><option value="partially_achieved">Partially achieved</option><option value="blocked">Blocked</option><option value="misdirected">Misdirected</option></select>
-            <textarea id="day-output" rows="2" maxlength="3000" placeholder="Concrete output produced"></textarea>
-            <textarea id="day-validation" rows="2" maxlength="3000" placeholder="How the output was validated"></textarea>
-            <label for="day-source">EVIDENCE SOURCE</label><select id="day-source"><option value="self_reported">Self reported</option><option value="tool_verified">Tool verified</option><option value="artifact_verified">Artifact verified</option></select>
-            <textarea id="day-lesson" rows="2" maxlength="2000" placeholder="One lesson worth retaining"></textarea>
-            <div class="form-actions"><button type="submit" class="danger solid">END &amp; DEBRIEF</button><button type="button" id="cancel-end">CANCEL</button></div>
+            <span>TELL KOVACS WHAT HAPPENED</span>
+            <textarea id="end-narrative" rows="6" maxlength="6000" placeholder="Describe the day naturally: what you produced, what worked, what failed, how you checked it, and what remains. Kovacs will classify the outcome and evidence for review."></textarea>
+            <p class="field-note">The day remains active until you approve the structured End Day proposal.</p>
+            <div class="form-actions"><button type="submit" class="primary">INTERPRET END DAY</button><button type="button" id="cancel-end">CANCEL</button></div>
           </form>
+          <div id="end-proposal" class="proposal hidden"></div>
           <p class="shortcut">CTRL + ALT + K toggles observation</p>
         </div>
       </section>

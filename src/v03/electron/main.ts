@@ -6,6 +6,9 @@ import { AmbientController } from "../../v02/controller.js";
 import { AmbientStateStore } from "../../v02/state-store.js";
 import type { AmbientStatus } from "../../v02/types.js";
 import { ElectronWindowCapture, WindowsActiveWindowProbe } from "../../v02/electron/adapters.js";
+import { LocalContextEngine } from "../../v032/context-engine.js";
+import { WindowsPerception } from "../../v032/windows-perception.js";
+import type { ContextFrame } from "../types.js";
 import { loadV03Config } from "../config.js";
 import { createV03Contracts } from "../contracts.js";
 import { V03Controller } from "../controller.js";
@@ -13,7 +16,7 @@ import { CodexV03Planner } from "../planner.js";
 import { V03Store } from "../store.js";
 import { CHECKPOINT_STATUSES, DAY_OUTCOMES, EVIDENCE_SOURCES, INTERVENTION_FEEDBACK_KINDS } from "../types.js";
 
-if (process.platform !== "win32") throw new Error("Kovacs V0.3.1 pet currently supports Windows only.");
+if (process.platform !== "win32") throw new Error("Kovacs V0.3.2 pet currently supports Windows only.");
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const config = loadV03Config();
@@ -36,7 +39,7 @@ function createPet(): BrowserWindow {
   const window = new BrowserWindow({
     width: 460, height: 780, minWidth: 390, minHeight: 600, show: false, frame: false, transparent: true,
     alwaysOnTop: true, resizable: true, maximizable: false, fullscreenable: false, skipTaskbar: false,
-    backgroundColor: "#00000000", title: "Kovacs V0.3.1",
+    backgroundColor: "#00000000", title: "Kovacs V0.3.2",
     webPreferences: {
       preload: path.join(config.applicationRoot, "ui", "v0.3", "preload.cjs"),
       contextIsolation: true, sandbox: true, nodeIntegration: false, webviewTag: false,
@@ -60,9 +63,23 @@ async function bootstrap(): Promise<void> {
   const settings = await ambientStore.loadSettings(config.v02.settings);
   const service = await KovacsService.create(config.v02.v01);
   store = await V03Store.create(config.databasePath, v03Contracts);
+  const contextEngine = new LocalContextEngine();
+  const perception = new WindowsPerception(path.join(config.applicationRoot, "scripts"));
+  let lastContext: ContextFrame | null = null;
   let operating: V03Controller;
   const ambient = new AmbientController(service, ambientStore, settings, new WindowsActiveWindowProbe(), new ElectronWindowCapture(), {
     operatingContext: () => operating?.contextSummary() ?? "",
+    contextualize: async (window, imagePath) => {
+      const sample = await perception.observe(window, imagePath);
+      const day = store?.getActiveDay() ?? null;
+      const frame = contextEngine.analyze({ application: window.application, windowTitle: window.title,
+        project: day?.project ?? null, activeCheckpoint: day?.checkpoints.find((item) => item.status === "active")?.title ?? null,
+        accessibilityText: sample.accessibilityText, ocrText: sample.ocrText, previous: lastContext });
+      store?.recordContextFrame(frame); lastContext = frame;
+      const query = `${frame.activity} ${frame.visible_intent} ${frame.artifact ?? ""} ${day?.objective ?? ""}`;
+      const memories = store?.searchMemories(query, 3) ?? [];
+      return `${contextEngine.summarize(frame, memories)}${sample.failures.length ? `\nLocal perception limitations: ${sample.failures.join(" | ")}` : ""}`;
+    },
     onReasoningComplete: (telemetry) => operating?.recordAmbientInvocation(telemetry),
   });
   operating = new V03Controller(ambient, store, new CodexV03Planner(config, v03Contracts));
@@ -74,13 +91,7 @@ async function bootstrap(): Promise<void> {
   ipcMain.handle("v03:bootstrap", () => ({ ambient: controller.getAmbientState(), operating: controller.snapshot(), settings, platform: process.platform, defaultProject: config.applicationRoot }));
   ipcMain.handle("v03:setup:draft", (_event, value: unknown) => {
     const input = payload(value, "setup");
-    return controller.draftSetup({
-      current_position: text(input.current_position, "Current position", 1000),
-      available_hours_per_week: Number(input.available_hours_per_week),
-      active_projects: text(input.active_projects, "Active projects", 2000),
-      weaknesses: text(input.weaknesses, "Growth edges", 2000),
-      desired_outcome: text(input.desired_outcome, "Desired outcome", 2000),
-    });
+    return controller.draftSetup({ narrative: text(input.narrative, "Your situation", 6000) });
   });
   ipcMain.handle("v03:setup:confirm", (_event, value: unknown) => controller.confirmSetup(text(payload(value, "setup confirmation").draft_id, "Draft identifier", 100)));
   ipcMain.handle("v03:setup:revise", (_event, value: unknown) => { const input = payload(value, "setup revision"); return controller.reviseSetupDraft(text(input.draft_id, "Draft identifier", 100), payload(input.proposal, "setup proposal") as never, text(input.reason, "Revision reason", 1000)); });
@@ -122,6 +133,9 @@ async function bootstrap(): Promise<void> {
     if (source !== "self_reported" && source !== "tool_verified" && source !== "artifact_verified") throw new Error("Invalid evidence source.");
     return controller.endDay({ outcome: input.outcome as (typeof DAY_OUTCOMES)[number], output_summary: text(input.output_summary, "Output summary", 3000), validation_summary: text(input.validation_summary, "Validation summary", 3000), lesson: text(input.lesson, "Lesson", 2000), evidence_source: source });
   });
+  ipcMain.handle("v03:day:end:draft", (_event, value: unknown) => controller.draftEndDay(text(payload(value, "end day narrative").narrative, "What happened today", 6000)));
+  ipcMain.handle("v03:day:end:confirm", (_event, value: unknown) => controller.confirmEndDay(text(payload(value, "end day confirmation").draft_id, "Draft identifier", 100)));
+  ipcMain.handle("v03:day:end:reject", (_event, value: unknown) => { const input = payload(value, "end day rejection"); return controller.rejectEndDayDraft(text(input.draft_id, "Draft identifier", 100), text(input.reason, "Rejection reason", 1000)); });
   ipcMain.handle("v03:memory:status", (_event, value: unknown) => { const input = payload(value, "memory status"); const status = input.status; if (status !== "active" && status !== "pending_confirmation") throw new Error("Invalid memory status."); return controller.setMemoryStatus(text(input.memory_id, "Memory identifier", 100), status); });
   ipcMain.handle("v03:memory:pin", (_event, value: unknown) => { const input = payload(value, "memory pin"); if (typeof input.pinned !== "boolean") throw new Error("Invalid pinned value."); return controller.setMemoryPinned(text(input.memory_id, "Memory identifier", 100), input.pinned); });
   ipcMain.handle("v03:memory:delete", (_event, value: unknown) => controller.deleteMemory(text(payload(value, "memory delete").memory_id, "Memory identifier", 100)));
@@ -147,7 +161,7 @@ async function bootstrap(): Promise<void> {
 app.whenReady().then(bootstrap).catch((error: unknown) => {
   const message = (error as Error).message;
   console.error(`Kovacs pet failed: ${message}`);
-  dialog.showErrorBox("Kovacs could not start safely", `${message}\n\nNo database was deleted or rebuilt. Restore a user-created backup or run npm run v031:validate before retrying.`);
+  dialog.showErrorBox("Kovacs could not start safely", `${message}\n\nNo database was deleted or rebuilt. Restore a user-created backup or run npm run v032:validate before retrying.`);
   app.quit();
 });
 app.on("second-instance", () => { pet?.show(); pet?.focus(); });

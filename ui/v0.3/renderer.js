@@ -64,6 +64,17 @@ function renderSetup() {
   const container = $("#setup-proposal");
   if (!proposal) { container.classList.add("hidden"); clear(container); return; }
   proposalShell(container, "PROPOSED 90-DAY MISSION", proposal.proposal.mission_title, proposal.proposal.rationale, proposal.proposal.warnings);
+  if (proposal.proposal.interpreted_profile) {
+    const profile = proposal.proposal.interpreted_profile, interpretation = node("div", "interpretation-grid");
+    const fields = [["CURRENT POSITION", profile.current_position], ["HOURS / WEEK", profile.available_hours_per_week], ["ACTIVE PROJECTS", profile.active_projects], ["GROWTH EDGES", profile.growth_edges], ["90-DAY OUTCOME", profile.desired_outcome]];
+    fields.forEach(([label, item]) => {
+      const card = node("div", "interpretation-item"), value = Array.isArray(item.value) ? item.value.join(" · ") : item.value;
+      card.append(node("span", "", label), node("strong", "", value === null ? "Not established" : String(value)), node("small", "", `${labelize(item.source)} · ${Math.round(item.confidence * 100)}% — ${item.rationale}`)); interpretation.append(card);
+    });
+    container.append(node("span", "micro-label", "KOVACS' INTERPRETATION"), interpretation);
+    if (proposal.proposal.assumptions?.length) { container.append(node("span", "micro-label", "ASSUMPTIONS TO VERIFY")); appendList(container, proposal.proposal.assumptions); }
+    if (proposal.proposal.clarification_questions?.length) { container.append(node("span", "micro-label", "CONSEQUENTIAL QUESTIONS")); appendList(container, proposal.proposal.clarification_questions); }
+  }
   container.append(node("span", "micro-label", "SUCCESS EVIDENCE")); appendList(container, proposal.proposal.mission_success_criteria);
   container.append(node("span", "micro-label", "FIRST ROLLING WEEK"), node("p", "proposal-outcome", proposal.proposal.weekly_outcome)); appendList(container, proposal.proposal.weekly_success_criteria);
   const competencies = node("p", "tags"); proposal.proposal.weekly_competencies.forEach((value) => competencies.append(node("b", "", labelize(value)))); container.append(competencies);
@@ -154,6 +165,23 @@ function renderActiveDay() {
   $("#pause").classList.toggle("hidden", status !== "observing"); $("#private").classList.toggle("hidden", status !== "observing"); $("#observe").classList.toggle("hidden", status !== "observing"); $("#resume").classList.toggle("hidden", status === "observing");
 }
 
+function renderEndDayProposal() {
+  const draft = operating.pending_end_day, container = $("#end-proposal");
+  if (!draft) { container.classList.add("hidden"); clear(container); return; }
+  const proposal = draft.proposal;
+  proposalShell(container, "PROPOSED END DAY", labelize(proposal.outcome), proposal.narrative_summary, proposal.missing_proof || []);
+  const facts = node("div", "interpretation-grid");
+  [["OUTPUT", proposal.output_summary], ["VALIDATION", proposal.validation_summary], ["EVIDENCE SOURCE", labelize(proposal.evidence_source)], ["LESSON", proposal.lesson]].forEach(([label, value]) => {
+    const item = node("div", "interpretation-item"); item.append(node("span", "", label), node("strong", "", value)); facts.append(item);
+  });
+  container.append(facts);
+  if (proposal.carry_forward.length) { container.append(node("span", "micro-label", "CARRY FORWARD")); appendList(container, proposal.carry_forward); }
+  if (proposal.assumptions.length) { container.append(node("span", "micro-label", "ASSUMPTIONS")); appendList(container, proposal.assumptions); }
+  container.append(node("p", "approval-note", "Confirming closes observation, records the structured evidence, and retains the lesson locally. Until then, the day remains active."));
+  const confirm = node("button", "danger solid full", "CONFIRM & END DAY"); confirm.addEventListener("click", () => action(() => window.kovacs.confirmEndDay(draft.draft_id))); container.append(confirm);
+  const reject = node("button", "tiny danger", "REJECT INTERPRETATION"); reject.addEventListener("click", () => action(() => window.kovacs.rejectEndDay(draft.draft_id, "User rejected the End Day interpretation"))); container.append(reject);
+}
+
 function renderCompetencies() {
   const container = $("#competencies"); clear(container);
   operating.competencies.forEach((item) => {
@@ -197,14 +225,14 @@ function render(message) {
   if (!configured) { renderSetup(); return; }
   ["today", "growth", "memory"].forEach((name) => $("#" + name + "-view").classList.toggle("hidden", currentTab !== name));
   document.querySelectorAll("#tabs button").forEach((button) => button.classList.toggle("active", button.dataset.tab === currentTab));
-  renderHierarchy(); renderWeekProposal(); renderDayProposal(); renderActiveDay(); renderCompetencies(); renderEvidence(); renderMemories();
+  renderHierarchy(); renderWeekProposal(); renderDayProposal(); renderActiveDay(); renderEndDayProposal(); renderCompetencies(); renderEvidence(); renderMemories();
 }
 
 window.kovacs.bootstrap().then((data) => { ambient = data.ambient; operating = data.operating; defaultProject = data.defaultProject; $("#project").value = operating.active_day?.project || defaultProject; $("#memory-days").value = operating.retention.memory_retention_days ?? ""; $("#sensitive-days").value = operating.retention.sensitive_memory_retention_days; render(); }).catch(showError);
 window.kovacs.onUpdate((update) => { ambient = update.ambient; operating = update.operating; if (update.response) { const box = $("#intervention"); box.classList.remove("empty"); clear(box); box.append(node("span", "", `${update.response.profile.toUpperCase()} · ${update.response.intervention.assistance_level}`), node("p", "", update.response.intervention.message), node("small", "", update.response.checkpoint)); const actions = node("div", "feedback-actions"); [["useful", "USEFUL"], ["not_useful", "NOT USEFUL"], ["wrong_context", "WRONG CONTEXT"], ["unnecessary_interruption", "INTERRUPTED"], ["already_known", "ALREADY KNEW"]].forEach(([kind, label]) => { const button = node("button", "tiny", label); button.addEventListener("click", () => action(() => window.kovacs.feedback(update.response.request_id, kind))); actions.append(button); }); const expand = node("button", "tiny", "EXPAND"); expand.addEventListener("click", () => action(async () => { await window.kovacs.feedback(update.response.request_id, "expanded"); return window.kovacs.observeNow(); })); actions.append(expand); box.append(actions); } render(update.message); });
 
 document.querySelectorAll("#tabs button").forEach((button) => button.addEventListener("click", () => { currentTab = button.dataset.tab; render(); }));
-$("#draft-setup").addEventListener("click", () => action(() => window.kovacs.draftSetup({ current_position: $("#current-position").value, available_hours_per_week: Number($("#available-hours").value), active_projects: $("#active-projects").value, weaknesses: $("#weaknesses").value, desired_outcome: $("#desired-outcome").value })));
+$("#draft-setup").addEventListener("click", () => action(() => window.kovacs.draftSetup({ narrative: $("#setup-narrative").value })));
 $("#draft-week").addEventListener("click", () => action(() => window.kovacs.draftWeek({ priorities: $("#week-priorities").value, constraints: $("#week-constraints").value })));
 $("#draft-day").addEventListener("click", () => action(() => window.kovacs.draftDay($("#project").value || defaultProject, $("#objective").value)));
 $("#pause").addEventListener("click", () => action(() => window.kovacs.setStatus("paused")));
@@ -215,7 +243,7 @@ $("#cancel-checkpoint").addEventListener("click", () => $("#checkpoint-form").cl
 $("#checkpoint-form").addEventListener("submit", (event) => { event.preventDefault(); const checkpoint = operating.active_day.checkpoints.find((item) => item.status === "active"); if (!checkpoint) return showError(new Error("No active checkpoint.")); action(async () => { const result = await window.kovacs.completeCheckpoint({ checkpoint_id: checkpoint.checkpoint_id, outcome: $("#checkpoint-outcome").value, result: $("#checkpoint-result").value, validation: $("#checkpoint-validation").value, assistance_level: $("#assistance").value, evidence_source: $("#checkpoint-source").value }); $("#checkpoint-form").classList.add("hidden"); $("#checkpoint-result").value = ""; $("#checkpoint-validation").value = ""; return result; }); });
 $("#save-objective").addEventListener("click", () => action(() => window.kovacs.reviseObjective($("#revised-objective").value, $("#objective-reason").value)));
 $("#open-end").addEventListener("click", () => $("#end-form").classList.remove("hidden")); $("#cancel-end").addEventListener("click", () => $("#end-form").classList.add("hidden"));
-$("#end-form").addEventListener("submit", (event) => { event.preventDefault(); action(() => window.kovacs.endDay({ outcome: $("#day-outcome").value, output_summary: $("#day-output").value, validation_summary: $("#day-validation").value, lesson: $("#day-lesson").value, evidence_source: $("#day-source").value })); });
+$("#end-form").addEventListener("submit", (event) => { event.preventDefault(); action(async () => { const result = await window.kovacs.draftEndDay($("#end-narrative").value); $("#end-form").classList.add("hidden"); return result; }); });
 $("#save-retention").addEventListener("click", () => action(() => window.kovacs.setRetention($("#memory-days").value ? Number($("#memory-days").value) : null, Number($("#sensitive-days").value))));
 $("#backup").addEventListener("click", () => action(async () => { const result = await window.kovacs.backup(); $("#backup-result").textContent = `Database: ${result.database} · JSON: ${result.export}`; }));
 $("#delete-day-memories").addEventListener("click", () => { if (operating.active_day && window.confirm("Delete every unpinned memory attributed to the current day?")) action(() => window.kovacs.deleteMemoriesByDay(operating.active_day.day_id)); });
