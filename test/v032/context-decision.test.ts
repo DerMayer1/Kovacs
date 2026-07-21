@@ -8,6 +8,7 @@ const perception = (overrides: Partial<AmbientLocalPerceptionResult> = {}): Ambi
   context_id: "ctx_decision", occurred_at: "2026-07-21T12:00:00.000Z", context: "Working on the active checkpoint",
   fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), confidence: 0.85, sufficient: true,
   conflicting: false, deterministic_trigger: false, changed_fields: ["activity"], screenshot: null,
+  prompt_injection_detected: false, sensitive_content_detected: false, sensitive_categories: [], screenshot_blocked_reason: null,
   capture_used: false, ocr_used: false, ...overrides,
 });
 

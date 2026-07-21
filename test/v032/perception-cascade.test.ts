@@ -44,12 +44,13 @@ test("a deterministic OCR failure may escalate the already captured frame to Cod
   assert.equal(result.ocr_used, true); assert.deepEqual(result.screenshot, captured.png);
 });
 
-test("screenshot is returned only after both UIA and OCR remain insufficient", async () => {
+test("an uninspectable screenshot is blocked when UIA and OCR are unavailable", async () => {
   const adapter = new FakePerception({ text: "", failure: "accessibility_unavailable" }, { text: "", failure: "ocr_unavailable" });
   const cascade = new PerceptionCascade(adapter, new LocalContextEngine());
   const result = await cascade.observe(cascadeInput(async () => { adapter.events.push("capture"); return captured; }));
   assert.deepEqual(adapter.events, ["uia", "capture", "ocr"]); assert.equal(result.capture_used, true);
-  assert.equal(result.ocr_used, true); assert.deepEqual(result.screenshot, captured.png);
+  assert.equal(result.ocr_used, true); assert.equal(result.screenshot, null);
+  assert.equal(result.screenshot_blocked_reason, "ocr_unavailable");
 });
 
 class FakeService {
@@ -77,6 +78,7 @@ test("AmbientController does not capture or attach an image when local perceptio
       context_id: "ctx_lazy", occurred_at: new Date().toISOString(), context: "Sufficient UIA context",
       fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), confidence: 0.8, sufficient: true,
       conflicting: false, deterministic_trigger: true, changed_fields: ["activity"], screenshot: null,
+      prompt_injection_detected: false, sensitive_content_detected: false, sensitive_categories: [], screenshot_blocked_reason: null,
       capture_used: false, ocr_used: false,
     }), onContextEvent: () => { contextEvents += 1; }, onWorkingContextCleared: () => { clears += 1; } });
   await controller.initialize(); await controller.startDay(project, "Prove lazy perception"); await controller.tick();

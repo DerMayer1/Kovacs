@@ -42,8 +42,8 @@ try {
   store.endDay(proposal);
   const backup = await store.createBackup(path.join(temporary, "backup")); await access(backup.database); await access(backup.export);
   const snapshot = store.snapshot();
-  const checks = { schema: snapshot.recovery.schema_version_applied === "0.3.2", context_sanitized: !JSON.stringify(snapshot.recent_context).includes("secret-client") && frame.text_digest?.length === 64,
-    vector_retrieval: memories.length > 0 && memories[0]!.provenance.startsWith("local-hybrid"), proposal_required: stillActive && draft.draft_id.startsWith("draft_"),
+  const checks = { schema: snapshot.recovery.schema_version_applied === "0.3.3", context_sanitized: !JSON.stringify(snapshot.recent_context).includes("secret-client") && frame.text_digest?.length === 64,
+    vector_retrieval: memories.length > 0 && memories[0]!.provenance.startsWith("local-"), proposal_required: stillActive && draft.draft_id.startsWith("draft_"),
     end_confirmed: snapshot.active_day === null && snapshot.pending_end_day === null, diagnostics: snapshot.context_diagnostics.length === 1,
     backup: true, no_window_titles: snapshot.retention.persist_window_titles === false };
   console.log(JSON.stringify({ checks, context: frame, retrieval: memories.map((item) => ({ claim: item.memory.claim, score: item.score, provenance: item.provenance })) }, null, 2));

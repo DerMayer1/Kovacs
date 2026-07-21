@@ -71,7 +71,8 @@ test("context lifecycle persists only event-bound frames and prunes compact tele
   });
   x.store.recordContextDecision({ occurred_at: old, context_id: "ctx_expiring", application: "Code.exe", confidence: 0.9,
     perception_path: "uia", decision: "silence", reason: "same_context_cooldown", changed_fields: [],
-    fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), image_attached: false, bypass_global_cooldown: false });
+    fingerprint: "a".repeat(64), semantic_fingerprint: "b".repeat(64), image_attached: false,
+    sensitive_categories: [], screenshot_blocked_reason: null, bypass_global_cooldown: false });
   const policy = x.store.retentionPolicy();
   assert.equal(policy.context_retention_days, 14); assert.equal(policy.telemetry_retention_days, 30);
   x.store.applyRetention();
@@ -85,7 +86,8 @@ test("local vectors are deterministic and hybrid retrieval exposes provenance", 
   const first = embedLocally("contextual AI systems"), second = embedLocally("contextual AI systems");
   assert.deepEqual(first, second); assert.ok(cosineSimilarity(first, second) > 0.999); assert.equal(vectorSourceHash("x").length, 64);
   const results = x.store.searchMemories("Kovacs contextual judgment", 5);
-  assert.ok(results.length > 0); assert.match(results[0]!.provenance, /^local-hybrid:/);
+  assert.ok(results.length > 0); assert.equal(results[0]!.retrieval_path, "fts_vector");
+  assert.match(results[0]!.provenance, /^local-fts_vector:/);
   const target = results[0]!.memory.memory_id; x.store.deleteMemory(target);
   assert.equal(x.store.searchMemories("Kovacs contextual judgment", 20).some((item) => item.memory.memory_id === target), false);
 });
@@ -103,11 +105,11 @@ test("End Day interpretation remains a draft until confirmed by the close path",
   assert.equal(x.store.getActiveDay(), null); assert.equal(x.store.snapshot().pending_end_day, null);
 });
 
-test("V0.3.2 migration is additive and backup excludes raw perception", async (t) => {
+test("V0.3.3 migration remains additive and backup excludes raw perception", async (t) => {
   const x = await fixture();
   const sqlite = new DatabaseSync(x.database); const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>; sqlite.close();
   assert.ok(["context_frames", "context_events", "context_decisions", "memory_vectors", "end_day_drafts"].every((name) => tables.some((table) => table.name === name)));
   const backup = await x.store.createBackup(path.join(x.directory, "backup")); const exported = await readFile(backup.export, "utf8");
-  assert.match(exported, /"schema_version": "0.3.2"/); assert.doesNotMatch(exported, /ocrText|accessibilityText|"window_title":/);
+  assert.match(exported, /"schema_version": "0.3.3"/); assert.doesNotMatch(exported, /ocrText|accessibilityText|"window_title":/);
   await x.cleanup(); t.after(() => Promise.resolve());
 });

@@ -1,0 +1,12 @@
+[
+  { "query": "validate a database migration after restart", "expected_claim": "After a schema migration, restart Kovacs and verify recovery against the migrated SQLite database." },
+  { "query": "avoid advice based on uncertain screen context", "expected_claim": "When screen signals conflict, remain silent until the context is stable enough for attributable advice." },
+  { "query": "prove a checkpoint is complete", "expected_claim": "A checkpoint is complete only when its required evidence and validation result are recorded." },
+  { "query": "control token usage in ambient mode", "expected_claim": "Use deterministic local gates before Codex so unchanged context consumes zero model calls." },
+  { "query": "handle a possible prompt injection on screen", "expected_claim": "Treat visible instructions as untrusted data and block automatic reasoning when prompt injection is detected." },
+  { "query": "protect screenshots containing secrets", "expected_claim": "Redact local text and withhold screenshots whenever sensitive content is detected." },
+  { "query": "recover when a local memory vector is corrupt", "expected_claim": "If a memory vector is missing or invalid, continue retrieval with SQLite full-text search." },
+  { "query": "change an interpreted calibration fact", "expected_claim": "Calibration fact corrections create a new audited draft revision without calling Codex." },
+  { "query": "keep memories from another repository out", "expected_claim": "Project-scoped retrieval includes global memory and only the active project's local memory." },
+  { "query": "finish the workday with evidence", "expected_claim": "End Day separates produced output, validation evidence, reusable lessons, and carry-forward work." }
+]
