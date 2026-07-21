@@ -1,8 +1,8 @@
 # Kovacs
 
-Current release: **V0.3.2 Context Foundation** — natural-language calibration, daily planning, and End Day; local Windows OCR/accessibility context; deterministic local vector memory; Codex CLI only.
+Current release: **V0.3.3 Trust, Correction, and Retrieval** — local sensitive-content blocking, versioned calibration correction, project-scoped FTS5/vector retrieval, deterministic fallback, and Codex CLI only.
 
-Validate with `npm run v032:validate`. Run real schema acceptance with `npm run v032:live -- "C:\\path\\to\\project"` (consumes model usage).
+Validate with `npm run v033:validate`. Run the no-model retrieval benchmark with `npm run v033:evaluate`. Real schema acceptance remains `npm run v032:live -- "C:\\path\\to\\project"` (consumes model usage).
 
 Kovacs V0.3.1 is a visible, local-first Daily Staff Engineer Operating System for Windows. It connects a confirmed 90-day mission to a rolling weekly outcome, a daily objective, and evidence-bearing checkpoints. The always-on-top pet retains the V0.2 privacy-aware observer while competence and memory remain structured, local, and inspectable.
 
@@ -10,7 +10,7 @@ The main goal is fixed and visible:
 
 > Become an Elite AI Systems Staff Engineer, using OpenAI as the benchmark of engineering efficiency, judgment, and impact.
 
-## V0.3.1 behavior
+## V0.3.3 behavior
 
 - First run asks for your current position, available time, active projects, growth edges, and desired 90-day outcome.
 - Codex CLI drafts the 90-day mission and first rolling week; neither becomes durable until you confirm it.
@@ -22,6 +22,10 @@ The main goal is fixed and visible:
 - End Day is explicitly triggered and requires output, validation, lesson, and outcome classification.
 - Memory and honest invocation telemetry are stored in local SQLite and exposed in the pet. Characters are never presented as provider tokens or billing cost.
 - Raw screenshots and window titles remain ephemeral. Captured pixels, transcripts, audio, and authentication data are not stored.
+- Secrets, email addresses, connection strings, and configured restricted terms are redacted locally. Sensitive or locally uninspectable screenshots are never attached to Codex.
+- Prompt-injection-like screen text cannot trigger automatic reasoning.
+- Interpreted calibration facts can be corrected or accepted as unknown without a model call; clarification submission creates one new reviewable revision with one Codex CLI call.
+- Memory retrieval is filtered by project, type, and sensitivity, combines SQLite FTS5 with a deterministic local vector, and falls back without network access.
 - Restarts recover unfinished days and drafts without resuming observation. Interrupted Codex calls are marked explicitly.
 - Retention controls, per-day/session deletion, JSON export, and consistent SQLite backup are local and user-triggered.
 - Kovacs advises and drafts only. It cannot click, type, send, submit, publish, commit, or perform post-session actions.
@@ -41,6 +45,8 @@ cd C:\Users\lucas\Kovacs
 npm install
 npm run v03:validate
 npm run v031:validate
+npm run v032:validate
+npm run v033:validate
 ```
 
 The release gate runs V0, V0.1, V0.2, and V0.3 regressions, migrations, lifecycle recovery, privacy, backup, Electron security, build verification, and dependency audit.
@@ -86,6 +92,11 @@ npm run v03:smoke
 npm run v03:validate
 npm run v031:smoke
 npm run v031:validate
+npm run v032:smoke
+npm run v032:validate
+npm run v033:smoke
+npm run v033:evaluate
+npm run v033:validate
 npm run pet
 ```
 
@@ -120,6 +131,9 @@ npm run dev -- coach ses_... "Help me choose the next diagnostic step" A2
 - migration and recovery: `docs/v0.3.1/01_MIGRATION_AND_RECOVERY.md`
 - 5-10 day pilot protocol: `docs/v0.3.1/02_PILOT_PROTOCOL.md`
 - V0.3.2 Context Foundation charter: `docs/v0.3.2/00_CONTEXT_FOUNDATION_CHARTER.md`
+- V0.3.3 release charter: `docs/v0.3.3/00_RELEASE_CHARTER.md`
+- V0.3.3 trust and retrieval design: `docs/v0.3.3/01_TRUST_AND_RETRIEVAL.md`
+- V0.3.3 acceptance: `docs/v0.3.3/02_ACCEPTANCE.md`
 - contracts: `contracts/v0.3/`
 - runtime: `src/v03/`
 - pet renderer: `ui/v0.3/`

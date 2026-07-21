@@ -1,6 +1,6 @@
 {
   "name": "kovacs",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "type": "module",
   "description": "A local-first, evidence-driven Staff Engineer operating system powered by Codex CLI.",
@@ -29,6 +29,9 @@
     "v032:validate": "tsx v032/validate.ts",
     "v032:smoke": "tsx v032/smoke.ts",
     "v032:live": "tsx v032/live.ts",
+    "v033:validate": "tsx v033/validate.ts",
+    "v033:smoke": "tsx v033/smoke.ts",
+    "v033:evaluate": "tsx v033/evaluate-retrieval.ts",
     "pet:v02": "npm run build && electron dist/src/v02/electron/main.js",
     "pet": "npm run build && electron dist/src/v03/electron/main.js"
   },
