@@ -7,6 +7,7 @@ import { AmbientStateStore } from "../../v02/state-store.js";
 import type { AmbientStatus } from "../../v02/types.js";
 import { ElectronWindowCapture, WindowsActiveWindowProbe } from "../../v02/electron/adapters.js";
 import { LocalContextEngine } from "../../v032/context-engine.js";
+import { PerceptionCascade } from "../../v032/perception-cascade.js";
 import { WindowsPerception } from "../../v032/windows-perception.js";
 import type { ContextFrame } from "../types.js";
 import { loadV03Config } from "../config.js";
@@ -65,20 +66,24 @@ async function bootstrap(): Promise<void> {
   store = await V03Store.create(config.databasePath, v03Contracts);
   const contextEngine = new LocalContextEngine();
   const perception = new WindowsPerception(path.join(config.applicationRoot, "scripts"));
+  const perceptionCascade = new PerceptionCascade(perception, contextEngine);
   let lastContext: ContextFrame | null = null;
+  let lastContextFingerprint: string | null = null;
   let operating: V03Controller;
   const ambient = new AmbientController(service, ambientStore, settings, new WindowsActiveWindowProbe(), new ElectronWindowCapture(), {
     operatingContext: () => operating?.contextSummary() ?? "",
-    contextualize: async (window, imagePath) => {
-      const sample = await perception.observe(window, imagePath);
+    localPerception: async (window, capture) => {
       const day = store?.getActiveDay() ?? null;
-      const frame = contextEngine.analyze({ application: window.application, windowTitle: window.title,
-        project: day?.project ?? null, activeCheckpoint: day?.checkpoints.find((item) => item.status === "active")?.title ?? null,
-        accessibilityText: sample.accessibilityText, ocrText: sample.ocrText, previous: lastContext });
-      store?.recordContextFrame(frame); lastContext = frame;
-      const query = `${frame.activity} ${frame.visible_intent} ${frame.artifact ?? ""} ${day?.objective ?? ""}`;
+      const result = await perceptionCascade.observe({ window, project: day?.project ?? null,
+        activeCheckpoint: day?.checkpoints.find((item) => item.status === "active")?.title ?? null,
+        previous: lastContext, capture });
+      if (result.fingerprint !== lastContextFingerprint) store?.recordContextFrame(result.frame);
+      lastContext = result.frame; lastContextFingerprint = result.fingerprint;
+      const query = `${result.frame.activity} ${result.frame.visible_intent} ${result.frame.artifact ?? ""} ${day?.objective ?? ""}`;
       const memories = store?.searchMemories(query, 3) ?? [];
-      return `${contextEngine.summarize(frame, memories)}${sample.failures.length ? `\nLocal perception limitations: ${sample.failures.join(" | ")}` : ""}`;
+      return { context: `${contextEngine.summarize(result.frame, memories)}\nPerception path: ${result.capture_used ? result.screenshot ? "UIA -> OCR -> screenshot" : "UIA -> OCR" : "UIA only"}${result.failures.length ? `\nLocal perception limitations: ${result.failures.join(" | ")}` : ""}`,
+        fingerprint: result.fingerprint, confidence: result.frame.confidence, sufficient: contextEngine.isSufficient(result.frame),
+        screenshot: result.screenshot, capture_used: result.capture_used, ocr_used: result.ocr_used };
     },
     onReasoningComplete: (telemetry) => operating?.recordAmbientInvocation(telemetry),
   });

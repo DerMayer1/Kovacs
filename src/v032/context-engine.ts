@@ -54,6 +54,21 @@ export class LocalContextEngine {
       text_digest: digest(normalize(`${accessibility}\n${ocr}`)) };
   }
 
+  isSufficient(frame: ContextFrame): boolean {
+    if (frame.privacy_classification !== "authorized" || !frame.text_digest) return false;
+    const accessibility = frame.signal_sources.includes("accessibility"), ocr = frame.signal_sources.includes("ocr");
+    const minimumConfidence = ocr && !accessibility ? 0.65 : 0.7;
+    if (frame.confidence + Number.EPSILON < minimumConfidence) return false;
+    return frame.activity !== "general_work" || frame.artifact !== null;
+  }
+
+  fingerprint(frame: ContextFrame): string {
+    return createHash("sha256").update(JSON.stringify({ application: frame.application, project: frame.project,
+      activity: frame.activity, artifact: frame.artifact, visible_intent: frame.visible_intent,
+      active_checkpoint: frame.active_checkpoint, privacy_classification: frame.privacy_classification,
+      text_digest: frame.text_digest }), "utf8").digest("hex");
+  }
+
   summarize(frame: ContextFrame, memories: MemoryRetrievalResult[]): string {
     const recalled = memories.slice(0, 3).map((item) => `- ${item.memory.claim} [${item.provenance}; score=${item.score.toFixed(2)}]`).join("\n");
     return [

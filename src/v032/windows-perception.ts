@@ -1,14 +1,20 @@
 import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ActiveWindowInfo } from "../v02/types.js";
 
 const execFileAsync = promisify(execFile);
 
-export interface PerceptionSample {
-  accessibilityText: string;
-  ocrText: string;
-  failures: string[];
+export interface LocalTextSignal {
+  text: string;
+  failure: "accessibility_unavailable" | "ocr_unavailable" | null;
+}
+
+export interface LocalPerceptionAdapter {
+  readAccessibility(window: ActiveWindowInfo): Promise<LocalTextSignal>;
+  readOcr(png: Buffer): Promise<LocalTextSignal>;
 }
 
 const compact = (value: string): string => value.replaceAll(/\s+/g, " ").trim().slice(0, 12_000);
@@ -24,13 +30,19 @@ export class WindowsPerception {
     return compact(result.stdout);
   }
 
-  async observe(window: ActiveWindowInfo, imagePath: string): Promise<PerceptionSample> {
-    const failures: string[] = [];
-    const accessibility = window.windowId
-      ? this.run("windows-uia.ps1", [String(window.windowId)]).catch((error: unknown) => { failures.push(`accessibility:${(error as Error).message.slice(0, 160)}`); return ""; })
-      : Promise.resolve("");
-    const ocr = this.run("windows-ocr.ps1", [imagePath]).catch((error: unknown) => { failures.push(`ocr:${(error as Error).message.slice(0, 160)}`); return ""; });
-    const [accessibilityText, ocrText] = await Promise.all([accessibility, ocr]);
-    return { accessibilityText, ocrText, failures };
+  async readAccessibility(window: ActiveWindowInfo): Promise<LocalTextSignal> {
+    if (!window.windowId) return { text: "", failure: "accessibility_unavailable" };
+    try { return { text: await this.run("windows-uia.ps1", [String(window.windowId)]), failure: null }; }
+    catch { return { text: "", failure: "accessibility_unavailable" }; }
+  }
+
+  async readOcr(png: Buffer): Promise<LocalTextSignal> {
+    const temporary = await mkdtemp(path.join(os.tmpdir(), "kovacs-local-ocr-"));
+    const imagePath = path.join(temporary, "authorized-window.png");
+    try {
+      await writeFile(imagePath, png, { flag: "wx" });
+      return { text: await this.run("windows-ocr.ps1", [imagePath]), failure: null };
+    } catch { return { text: "", failure: "ocr_unavailable" }; }
+    finally { await rm(temporary, { recursive: true, force: true }); }
   }
 }

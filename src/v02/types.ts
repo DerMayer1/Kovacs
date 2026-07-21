@@ -56,6 +56,16 @@ export interface CapturedFrame {
   png: Buffer;
 }
 
+export interface AmbientLocalPerceptionResult {
+  context: string;
+  fingerprint: string;
+  confidence: number;
+  sufficient: boolean;
+  screenshot: Buffer | null;
+  capture_used: boolean;
+  ocr_used: boolean;
+}
+
 export interface WindowProbe { getActiveWindow(): Promise<ActiveWindowInfo | null>; }
 export interface FrameCapture { capture(window: ActiveWindowInfo): Promise<CapturedFrame | null>; }
 
@@ -78,6 +88,6 @@ export interface AmbientReasoningTelemetry {
 
 export interface AmbientControllerOptions {
   operatingContext?: () => string | Promise<string>;
-  contextualize?: (window: ActiveWindowInfo, imagePath: string) => string | Promise<string>;
+  localPerception?: (window: ActiveWindowInfo, capture: () => Promise<CapturedFrame | null>) => AmbientLocalPerceptionResult | Promise<AmbientLocalPerceptionResult>;
   onReasoningComplete?: (telemetry: AmbientReasoningTelemetry) => void | Promise<void>;
 }
