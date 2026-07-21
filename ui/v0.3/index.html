@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Kovacs V0.3.2</title>
+  <title>Kovacs V0.3.3</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell" data-state="idle">
     <header class="dragbar">
-      <div class="wordmark">KOVACS <span>V0.3.2</span></div>
+      <div class="wordmark">KOVACS <span>V0.3.3</span></div>
       <div class="header-actions">
         <div class="capture-state"><i></i><span id="state-label">IDLE</span></div>
         <button id="close" class="window-close" aria-label="Close Kovacs"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
@@ -95,6 +95,8 @@
         <div class="context-policy"><span>WORKING CONTEXT</span><strong>RAM only · 10 minute TTL</strong><p>Cleared on Pause, Private, End Day, and restart.</p></div>
         <div class="context-policy"><span>DURABLE CONTEXT</span><strong>Event-bound · 14 days</strong><p>Evidence-linked context follows evidence. Decision telemetry expires after 30 days.</p></div>
         <div id="context-decisions" class="memory-list"></div>
+        <div class="section-heading evidence-heading"><span>MEMORY RETRIEVAL</span><strong>What context recalled</strong><p>Only identifiers, scores, provenance, and query hashes are retained here.</p></div>
+        <div id="retrieval-diagnostics" class="memory-list"></div>
       </section>
     </div>
     <p id="error" class="error hidden"></p>

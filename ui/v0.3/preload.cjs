@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("kovacs", {
   draftSetup: (input) => ipcRenderer.invoke("v03:setup:draft", input),
   confirmSetup: (draft_id) => ipcRenderer.invoke("v03:setup:confirm", { draft_id }),
   reviseSetupDraft: (draft_id, proposal, reason) => ipcRenderer.invoke("v03:setup:revise", { draft_id, proposal, reason }),
+  correctSetupDraft: (draft_id, values, accepted_unknowns, reason) => ipcRenderer.invoke("v03:setup:correct", { draft_id, values, accepted_unknowns, reason }),
+  refineSetupDraft: (draft_id, answers) => ipcRenderer.invoke("v03:setup:refine", { draft_id, answers }),
   draftWeek: (input) => ipcRenderer.invoke("v03:week:draft", input),
   confirmWeek: (draft_id) => ipcRenderer.invoke("v03:week:confirm", { draft_id }),
   reviseWeekDraft: (draft_id, proposal, reason) => ipcRenderer.invoke("v03:week:revise", { draft_id, proposal, reason }),

@@ -74,6 +74,47 @@ function renderSetup() {
     container.append(node("span", "micro-label", "KOVACS' INTERPRETATION"), interpretation);
     if (proposal.proposal.assumptions?.length) { container.append(node("span", "micro-label", "ASSUMPTIONS TO VERIFY")); appendList(container, proposal.proposal.assumptions); }
     if (proposal.proposal.clarification_questions?.length) { container.append(node("span", "micro-label", "CONSEQUENTIAL QUESTIONS")); appendList(container, proposal.proposal.clarification_questions); }
+    container.append(node("span", "micro-label", `DRAFT REVISION ${proposal.revision || 1}`));
+    const correction = node("details", "inline-control"), correctionSummary = node("summary", "", "CORRECT INTERPRETED FACTS LOCALLY");
+    const controls = {};
+    const correctionFields = [
+      ["current_position", "CURRENT POSITION", "text"], ["available_hours_per_week", "HOURS / WEEK", "number"],
+      ["active_projects", "ACTIVE PROJECTS — ONE PER LINE", "list"], ["growth_edges", "GROWTH EDGES — ONE PER LINE", "list"],
+      ["desired_outcome", "DESIRED 90-DAY OUTCOME", "text"],
+    ];
+    correctionFields.forEach(([key, label, kind]) => {
+      const interpreted = profile[key], input = kind === "number" ? node("input") : node("textarea");
+      if (kind === "number") { input.type = "number"; input.min = "1"; input.max = "100"; }
+      else input.rows = kind === "list" ? 3 : 2;
+      input.value = Array.isArray(interpreted.value) ? interpreted.value.join("\n") : interpreted.value ?? "";
+      const unknownLabel = node("label", "unknown-control"), unknown = node("input"); unknown.type = "checkbox"; unknown.checked = interpreted.value === null;
+      unknownLabel.append(unknown, document.createTextNode(" Explicitly keep this value unknown"));
+      correction.append(node("label", "", label), input, unknownLabel); controls[key] = { input, unknown, kind };
+    });
+    const correctionReason = node("textarea"); correctionReason.rows = 2; correctionReason.placeholder = "Why these facts are being confirmed or corrected";
+    const saveFacts = node("button", "", "SAVE FACT CORRECTIONS — NO CODEX CALL");
+    saveFacts.addEventListener("click", () => {
+      const values = {}, unknowns = [];
+      Object.entries(controls).forEach(([key, control]) => {
+        if (control.unknown.checked) { unknowns.push(key); return; }
+        if (control.kind === "list") values[key] = control.input.value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+        else if (control.kind === "number") values[key] = Number(control.input.value);
+        else values[key] = control.input.value.trim();
+      });
+      action(() => window.kovacs.correctSetupDraft(proposal.draft_id, values, unknowns, correctionReason.value));
+    });
+    correction.append(node("label", "", "CORRECTION REASON"), correctionReason, saveFacts); container.append(correction);
+    if (proposal.proposal.clarification_questions?.length) {
+      const refinement = node("details", "inline-control"), refinementSummary = node("summary", "", "ANSWER QUESTIONS & REINTERPRET");
+      const answers = proposal.proposal.clarification_questions.map((question) => { const answer = node("textarea"); answer.rows = 2; answer.placeholder = question; refinement.append(node("label", "", question), answer); return { question, answer }; });
+      const questions = Array.from(refinement.childNodes);
+      const refine = node("button", "primary", "REINTERPRET WITH ONE CODEX CALL");
+      refine.addEventListener("click", () => action(() => window.kovacs.refineSetupDraft(
+        proposal.draft_id,
+        answers.filter((item) => item.answer.value.trim()).map((item) => ({ question: item.question, answer: item.answer.value.trim() })),
+      )));
+      refinement.append(refinementSummary, ...questions, refine); container.append(refinement);
+    }
   }
   container.append(node("span", "micro-label", "SUCCESS EVIDENCE")); appendList(container, proposal.proposal.mission_success_criteria);
   container.append(node("span", "micro-label", "FIRST ROLLING WEEK"), node("p", "proposal-outcome", proposal.proposal.weekly_outcome)); appendList(container, proposal.proposal.weekly_success_criteria);
@@ -225,8 +266,19 @@ function renderContextDiagnostics() {
     meta.append(node("span", "", `${decision.decision.toUpperCase()} · ${labelize(decision.reason)}`), node("b", "", `${Math.round(decision.confidence * 100)}%`));
     const path = decision.perception_path.replaceAll("_", " → ").toUpperCase();
     const delta = decision.changed_fields.length ? decision.changed_fields.map(labelize).join(" · ") : "No semantic delta";
-    card.append(meta, node("p", "", `${decision.application} · ${path}`), node("small", "", `${delta}${decision.image_attached ? " · image attached" : " · no image"}`));
+    const security = decision.screenshot_blocked_reason ? ` · image blocked: ${labelize(decision.screenshot_blocked_reason)}` : decision.image_attached ? " · image attached" : " · no image";
+    const sensitive = decision.sensitive_categories?.length ? ` · protected: ${decision.sensitive_categories.map(labelize).join(", ")}` : "";
+    card.append(meta, node("p", "", `${decision.application} · ${path}`), node("small", "", `${delta}${security}${sensitive}`));
     container.append(card);
+  });
+  const retrievals = $("#retrieval-diagnostics"); clear(retrievals);
+  const diagnostics = operating.retrieval_diagnostics || [];
+  if (!diagnostics.length) retrievals.append(node("p", "empty-copy", "No memory retrieval decision has been recorded yet."));
+  diagnostics.forEach((diagnostic) => {
+    const card = node("article", "context-decision"), meta = node("div", "memory-meta");
+    meta.append(node("span", "", labelize(diagnostic.retrieval_path)), node("b", "", `${diagnostic.results.length} result${diagnostic.results.length === 1 ? "" : "s"}`));
+    card.append(meta, node("p", "", diagnostic.project || "Global context"), node("small", "", diagnostic.results.map((item) => `${item.memory_id.slice(0, 12)} · ${item.score.toFixed(2)} · ${item.provenance}`).join("\n") || "No eligible memory"));
+    retrievals.append(card);
   });
 }
 
