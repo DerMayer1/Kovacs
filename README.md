@@ -1,5 +1,9 @@
 # Kovacs
 
+Current release: **V0.3.2 Context Foundation** — natural-language calibration, daily planning, and End Day; local Windows OCR/accessibility context; deterministic local vector memory; Codex CLI only.
+
+Validate with `npm run v032:validate`. Run real schema acceptance with `npm run v032:live -- "C:\\path\\to\\project"` (consumes model usage).
+
 Kovacs V0.3.1 is a visible, local-first Daily Staff Engineer Operating System for Windows. It connects a confirmed 90-day mission to a rolling weekly outcome, a daily objective, and evidence-bearing checkpoints. The always-on-top pet retains the V0.2 privacy-aware observer while competence and memory remain structured, local, and inspectable.
 
 The main goal is fixed and visible:
