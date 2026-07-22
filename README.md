@@ -327,9 +327,8 @@ Start with:
 - **Now — V0.3.3 pilot:** measure usefulness, false interventions, latency, privacy, recovery, and Codex consumption during real work.
 - **Next — reliability hardening:** turn pilot failures into explicit perception and product requirements.
 - **Planned — V0.4 Google Meet Advisory Mode:** caption-first, real-time, advisory guidance with no autonomous post-meeting actions.
-- **Later — Career Mode:** CV, role-fit, communication, and professional-positioning assistance, still advisory-only.
 
-The roadmap is directional. New modes will not be added before the current context loop is proven in real use.
+The roadmap is directional.
 
 ## Design principles
 
