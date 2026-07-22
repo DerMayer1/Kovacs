@@ -9,6 +9,7 @@ const results: Array<{ id: string; pass: boolean; detail: string }> = [];
 const record = (id: string, pass: boolean, detail: string) => results.push({ id, pass, detail });
 const required = [
   "docs/v0.3.3/00_RELEASE_CHARTER.md", "docs/v0.3.3/01_TRUST_AND_RETRIEVAL.md", "docs/v0.3.3/02_ACCEPTANCE.md",
+  "docs/assets/kovacs-narwhal.png",
   "src/v033/sensitive-content.ts", "test/v033/trust-retrieval.test.ts", "benchmarks/v0.3.3/retrieval-cases.json",
   "v033/smoke.ts", "v033/evaluate-retrieval.ts",
 ];

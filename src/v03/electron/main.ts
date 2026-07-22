@@ -18,11 +18,11 @@ import { CodexV03Planner } from "../planner.js";
 import { V03Store } from "../store.js";
 import { CHECKPOINT_STATUSES, DAY_OUTCOMES, EVIDENCE_SOURCES, INTERVENTION_FEEDBACK_KINDS } from "../types.js";
 
-if (process.platform !== "win32") throw new Error("Kovacs V0.3.3 pet currently supports Windows only.");
+if (process.platform !== "win32") throw new Error("Kovacs V0.3.3 desktop presence currently supports Windows only.");
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const config = loadV03Config();
-let pet: BrowserWindow | null = null;
+let presenceWindow: BrowserWindow | null = null;
 let controller: V03Controller;
 let store: V03Store | null = null;
 let interval: NodeJS.Timeout | null = null;
@@ -42,7 +42,7 @@ function textList(value: unknown, label: string, maximumItems = 20): string[] {
   return value.map((item, index) => text(item, `${label} ${index + 1}`, 500));
 }
 
-function createPet(): BrowserWindow {
+function createKovacsWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 460, height: 780, minWidth: 390, minHeight: 600, show: false, frame: false, transparent: true,
     alwaysOnTop: true, resizable: true, maximizable: false, fullscreenable: false, skipTaskbar: false,
@@ -117,8 +117,8 @@ async function bootstrap(): Promise<void> {
   operating = new V03Controller(ambient, store, new CodexV03Planner(config, v03Contracts));
   controller = operating;
   await controller.initialize();
-  pet = createPet();
-  controller.onUpdate((update) => pet?.webContents.send("v03:update", update));
+  presenceWindow = createKovacsWindow();
+  controller.onUpdate((update) => presenceWindow?.webContents.send("v03:update", update));
 
   ipcMain.handle("v03:bootstrap", () => ({ ambient: controller.getAmbientState(), operating: controller.snapshot(), settings, platform: process.platform, defaultProject: config.applicationRoot }));
   ipcMain.handle("v03:setup:draft", (_event, value: unknown) => {
@@ -199,10 +199,10 @@ async function bootstrap(): Promise<void> {
   ipcMain.handle("v03:close", async () => {
     const state = controller.getAmbientState();
     if (state && state.status !== "ended" && state.status !== "paused") await controller.setStatus("paused");
-    pet?.close();
+    presenceWindow?.close();
   });
 
-  interval = setInterval(() => { void ambient.tick().catch((error: unknown) => pet?.webContents.send("v03:update", { ambient: controller.getAmbientState(), operating: controller.snapshot(), message: `Observation failed safely: ${(error as Error).message}` })); }, settings.sample_interval_ms);
+  interval = setInterval(() => { void ambient.tick().catch((error: unknown) => presenceWindow?.webContents.send("v03:update", { ambient: controller.getAmbientState(), operating: controller.snapshot(), message: `Observation failed safely: ${(error as Error).message}` })); }, settings.sample_interval_ms);
   globalShortcut.register("CommandOrControl+Alt+K", () => {
     const state = controller.getAmbientState(); if (!state || state.status === "ended") return;
     void controller.setStatus(state.status === "observing" ? "paused" : "observing");
@@ -211,10 +211,10 @@ async function bootstrap(): Promise<void> {
 
 app.whenReady().then(bootstrap).catch((error: unknown) => {
   const message = (error as Error).message;
-  console.error(`Kovacs pet failed: ${message}`);
+  console.error(`Kovacs desktop presence failed: ${message}`);
   dialog.showErrorBox("Kovacs could not start safely", `${message}\n\nNo database was deleted or rebuilt. Restore a user-created backup or run npm run v032:validate before retrying.`);
   app.quit();
 });
-app.on("second-instance", () => { pet?.show(); pet?.focus(); });
+app.on("second-instance", () => { presenceWindow?.show(); presenceWindow?.focus(); });
 app.on("before-quit", () => { if (interval) clearInterval(interval); globalShortcut.unregisterAll(); store?.close(); });
 app.on("window-all-closed", () => app.quit());

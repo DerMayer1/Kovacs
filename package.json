@@ -33,7 +33,8 @@
     "v033:smoke": "tsx v033/smoke.ts",
     "v033:evaluate": "tsx v033/evaluate-retrieval.ts",
     "pet:v02": "npm run build && electron dist/src/v02/electron/main.js",
-    "pet": "npm run build && electron dist/src/v03/electron/main.js"
+    "kovacs": "npm run build && electron dist/src/v03/electron/main.js",
+    "pet": "npm run kovacs"
   },
   "dependencies": {
     "get-windows": "9.3.0",
