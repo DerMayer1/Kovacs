@@ -3,7 +3,7 @@
 Run:
 
 ```powershell
-npm run v033:validate
+npm run release:validate
 ```
 
 The automated gate requires:
@@ -20,4 +20,4 @@ The automated gate requires:
 - the fixed corpus reaches at least 80% Top-5 recall;
 - source inspection confirms Codex CLI remains the sole reasoning gateway and external actions remain impossible.
 
-`npm run v033:evaluate` prints the deterministic corpus result. It consumes no model usage.
+`npm run retrieval:evaluate` prints the deterministic corpus result. It consumes no model usage.

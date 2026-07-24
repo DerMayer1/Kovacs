@@ -11,6 +11,10 @@ Kovacs is a local-first, event-driven engineering tutor. Preserve these rules:
 - Prefer SQLite and local files for the initial product.
 - Keep the runtime testable without calling Codex.
 - Every intervention must be attributable to an event and recorded with its outcome when known.
+- Keep production modules responsibility-based: `core`, `application`, `infrastructure`, and `interfaces`.
+- Do not add version-named directories under `src`, `test`, or the active `ui` tree.
+- Keep version identifiers only at compatibility boundaries: schemas, migrations, IPC, release documentation, and release gates.
+- Preserve the dependency direction documented in `docs/ARCHITECTURE.md`.
 
 Before completing changes, run:
 

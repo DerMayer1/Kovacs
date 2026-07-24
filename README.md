@@ -163,7 +163,7 @@ Kovacs cannot:
 git clone https://github.com/DerMayer1/Kovacs.git
 cd Kovacs
 npm install
-npm run v033:validate
+npm run release:validate
 ```
 
 The V0.3.3 gate runs previous-version regressions, migrations, privacy checks, recovery tests, Electron security checks, the retrieval benchmark, typecheck, build, and dependency audit.
@@ -237,13 +237,13 @@ These numbers describe the current repository test suite and internal benchmark.
 Run the no-model retrieval benchmark independently:
 
 ```powershell
-npm run v033:evaluate
+npm run retrieval:evaluate
 ```
 
 Run the real schema-constrained Codex acceptance separately — it consumes model usage:
 
 ```powershell
-npm run v032:live -- "C:\path\to\an\authorized\project"
+npm run acceptance:live -- "C:\path\to\an\authorized\project"
 ```
 
 ## Why Codex CLI
@@ -279,9 +279,10 @@ Denied title patterns override the application allowlist.
 | `npm run typecheck` | Validate TypeScript without emitting files. |
 | `npm test` | Run the complete automated test suite. |
 | `npm run build` | Build the project. |
-| `npm run v033:smoke` | Exercise the V0.3.3 trust and retrieval integration locally. |
-| `npm run v033:evaluate` | Run the deterministic retrieval corpus without model usage. |
-| `npm run v033:validate` | Run the complete layered release gate. |
+| `npm run release:smoke` | Exercise the current trust and retrieval integration locally. |
+| `npm run retrieval:evaluate` | Run the deterministic retrieval corpus without model usage. |
+| `npm run release:validate` | Run the complete layered release gate. |
+| `npm run acceptance:live` | Run the real schema-constrained Codex acceptance. |
 
 The historical gates remain independently runnable when isolating a regression:
 
@@ -289,7 +290,7 @@ The historical gates remain independently runnable when isolating a regression:
 npm run v03:validate
 npm run v031:validate
 npm run v032:validate
-npm run v033:validate
+npm run release:validate
 ```
 
 The original terminal tutor remains available:
@@ -302,20 +303,21 @@ npm run dev -- coach ses_... "Help me choose the next diagnostic step" A2
 ## Repository map
 
 ```text
-src/v01/      Codex CLI gateway, contracts, privacy, terminal tutor
-src/v02/      Ambient observer, authorization, capture policy
-src/v03/      Daily operating system, SQLite state, Electron runtime
-src/v032/     Context engine, Windows perception, local vectors
-src/v033/     Sensitive-content trust boundary
-ui/v0.3/      Always-on-top Kovacs desktop presence
-contracts/    Schema-constrained model and state contracts
-test/         Layered regression and release tests
-benchmarks/   Deterministic retrieval evaluation corpus
-docs/         Architecture, charters, policies, and pilot protocol
+src/core/              Stable domain types and deterministic policy
+src/application/       Coaching, observation, planning, and operating use cases
+src/infrastructure/    Codex, SQLite, contracts, configuration, and Windows adapters
+src/interfaces/        CLI and Electron delivery surfaces
+ui/desktop/            Always-on-top Kovacs desktop presence
+contracts/             Versioned model and persistence schemas
+test/                  Capability-oriented regression tests
+scripts/releases/      Historical and current release gates
+benchmarks/            Deterministic retrieval evaluation corpus
+docs/                  Current architecture, release history, and pilot protocol
 ```
 
 Start with:
 
+- [Current architecture](./docs/ARCHITECTURE.md)
 - [V0.3.3 release charter](./docs/v0.3.3/00_RELEASE_CHARTER.md)
 - [Trust and retrieval design](./docs/v0.3.3/01_TRUST_AND_RETRIEVAL.md)
 - [V0.3.3 acceptance criteria](./docs/v0.3.3/02_ACCEPTANCE.md)

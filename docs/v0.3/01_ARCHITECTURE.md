@@ -21,12 +21,16 @@ Daily objective
 
 ## Boundaries
 
-- `src/v03/controller.ts` owns the V0.3 lifecycle and confirmation boundary.
-- `src/v03/store.ts` owns SQLite migrations, plans, checkpoints, evidence, competence, memories, and usage telemetry.
-- `src/v03/planner.ts` owns schema-constrained setup, week, and day proposals through `codex exec`.
-- `src/v02/controller.ts` remains the capture and ambient-intervention layer. V0.3 supplies only a compact structured operating-context summary and receives telemetry.
-- `src/v01/` remains the coaching, privacy, assistance, schema-validation, and read-only execution kernel.
-- `ui/v0.3/` is presentation only. Its sandboxed preload exposes a fixed command surface and no filesystem, process, or arbitrary IPC capability.
+- `src/application/operating-system/operating-system.ts` owns the lifecycle and confirmation boundary.
+- `src/infrastructure/persistence/sqlite-operating-store.ts` owns SQLite migrations, plans, checkpoints, evidence, competence, memories, and usage telemetry.
+- `src/application/planning/codex-planner.ts` owns schema-constrained setup, week, and day proposals through `codex exec`.
+- `src/application/observation/observation-controller.ts` owns capture and ambient-intervention orchestration. The operating system supplies only a compact structured context summary and receives telemetry.
+- `src/core/coaching/` and `src/application/coaching/` contain the coaching, privacy, assistance, and read-only execution kernel.
+- `ui/desktop/` is presentation only. Its sandboxed preload exposes a fixed command surface and no filesystem, process, or arbitrary IPC capability.
+
+The current responsibility-based module boundaries are normative in
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md). Version numbers remain only in
+schemas, migrations, release documentation, and release gates.
 
 ## Codex boundary
 
