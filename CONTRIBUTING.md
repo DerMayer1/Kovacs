@@ -23,7 +23,7 @@ directly to a pull request.
 Requirements:
 
 - Windows 10 or 11;
-- Node.js 22.12.0;
+- Node.js 22.13.0 or newer (`.nvmrc` declares the validated maintenance release);
 - npm;
 - Codex CLI only for explicitly live acceptance checks.
 

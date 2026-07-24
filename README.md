@@ -156,7 +156,7 @@ Kovacs cannot:
 ### Requirements
 
 - Windows 10 or 11
-- Node.js 22.12 or newer
+- Node.js 22.13 or newer
 - an installed and authenticated Codex CLI
 
 ### Install and validate

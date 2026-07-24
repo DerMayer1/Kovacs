@@ -6,7 +6,7 @@
   "type": "module",
   "description": "A local-first, evidence-driven Staff Engineer operating system powered by Codex CLI.",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "bin": {
     "kovacs": "dist/src/cli.js"

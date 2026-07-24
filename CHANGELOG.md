@@ -21,6 +21,8 @@ boundaries when accompanied by an explicit migration.
 - Production modules, tests, release gates, and UI are organized by
   responsibility rather than active version folders.
 - Direct and development dependencies are pinned to reviewed versions.
+- The minimum Node.js version is 22.13.0, where `node:sqlite` is available
+  without an experimental runtime flag.
 
 ## 0.3.3 - 2026-07-21
 
