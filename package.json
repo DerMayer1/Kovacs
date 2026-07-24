@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "ci": "npm run release:validate",
     "dev": "tsx src/cli.ts",
     "start": "node dist/src/cli.js",
     "test": "node --import tsx --test test/**/*.test.ts",
@@ -43,14 +44,14 @@
   },
   "dependencies": {
     "get-windows": "9.3.0",
-    "ajv": "latest",
-    "ajv-formats": "latest"
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   },
   "devDependencies": {
-    "@types/node": "latest",
+    "@types/node": "26.1.1",
     "electron": "43.1.1",
-    "tsx": "latest",
-    "typescript": "latest"
+    "tsx": "4.23.1",
+    "typescript": "7.0.2"
   },
   "overrides": {
     "tar": "7.5.20"
