@@ -9,6 +9,7 @@ Kovacs turns real work into structured goals, timely guidance, reviewable eviden
 <img src="./docs/assets/kovacs-narwhal.png" alt="Kovacs represented as a geometric narwhal" width="720">
 
 [![Version](https://img.shields.io/badge/version-v0.3.3-D9FF43?style=flat-square&labelColor=111111)](./docs/v0.3.3/00_RELEASE_CHARTER.md)
+[![CI](https://github.com/DerMayer1/Kovacs/actions/workflows/ci.yml/badge.svg)](https://github.com/DerMayer1/Kovacs/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-Windows-5EA7FF?style=flat-square&labelColor=111111)](#requirements)
 [![Runtime](https://img.shields.io/badge/runtime-Node.js%2022+-8CC84B?style=flat-square&labelColor=111111)](#requirements)
 [![Reasoning](https://img.shields.io/badge/reasoning-Codex%20CLI-FFFFFF?style=flat-square&labelColor=111111)](#why-codex-cli)
@@ -162,7 +163,7 @@ Kovacs cannot:
 ```powershell
 git clone https://github.com/DerMayer1/Kovacs.git
 cd Kovacs
-npm install
+npm ci
 npm run release:validate
 ```
 
@@ -279,6 +280,7 @@ Denied title patterns override the application allowlist.
 | `npm run typecheck` | Validate TypeScript without emitting files. |
 | `npm test` | Run the complete automated test suite. |
 | `npm run build` | Build the project. |
+| `npm run ci` | Run the canonical locked-dependency quality gate used by GitHub Actions. |
 | `npm run release:smoke` | Exercise the current trust and retrieval integration locally. |
 | `npm run retrieval:evaluate` | Run the deterministic retrieval corpus without model usage. |
 | `npm run release:validate` | Run the complete layered release gate. |
@@ -313,11 +315,16 @@ test/                  Capability-oriented regression tests
 scripts/releases/      Historical and current release gates
 benchmarks/            Deterministic retrieval evaluation corpus
 docs/                  Current architecture, release history, and pilot protocol
+.github/               Windows CI and pull-request contribution contract
 ```
 
 Start with:
 
 - [Current architecture](./docs/ARCHITECTURE.md)
+- [Contribution guide](./CONTRIBUTING.md)
+- [Security policy](./SECURITY.md)
+- [Changelog](./CHANGELOG.md)
+- [Release process](./docs/RELEASING.md)
 - [V0.3.3 release charter](./docs/v0.3.3/00_RELEASE_CHARTER.md)
 - [Trust and retrieval design](./docs/v0.3.3/01_TRUST_AND_RETRIEVAL.md)
 - [V0.3.3 acceptance criteria](./docs/v0.3.3/02_ACCEPTANCE.md)
@@ -340,6 +347,11 @@ The roadmap is directional.
 4. **Silence is a valid result.** No intervention is better than a weak interruption.
 5. **User authority is absolute.** Every durable plan, sensitive memory, and meaningful transition remains reviewable.
 6. **No capability theater.** Automated metrics, live acceptance, and real-world pilot evidence are reported separately.
+
+## License status
+
+No open-source license has been granted yet. A deliberate license decision is
+required before the first tagged public release.
 
 ---
 
