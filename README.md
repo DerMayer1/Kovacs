@@ -10,6 +10,7 @@ Kovacs turns real work into structured goals, timely guidance, reviewable eviden
 
 [![Version](https://img.shields.io/badge/version-v0.3.3-D9FF43?style=flat-square&labelColor=111111)](./docs/v0.3.3/00_RELEASE_CHARTER.md)
 [![CI](https://github.com/DerMayer1/Kovacs/actions/workflows/ci.yml/badge.svg)](https://github.com/DerMayer1/Kovacs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-FFFFFF?style=flat-square&labelColor=111111)](./LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-5EA7FF?style=flat-square&labelColor=111111)](#requirements)
 [![Runtime](https://img.shields.io/badge/runtime-Node.js%2022+-8CC84B?style=flat-square&labelColor=111111)](#requirements)
 [![Reasoning](https://img.shields.io/badge/reasoning-Codex%20CLI-FFFFFF?style=flat-square&labelColor=111111)](#why-codex-cli)
@@ -350,8 +351,9 @@ The roadmap is directional.
 
 ## License status
 
-No open-source license has been granted yet. A deliberate license decision is
-required before the first tagged public release.
+Kovacs is licensed under the [Apache License 2.0](./LICENSE).
+
+Copyright 2026 Lucas Zimmermann.
 
 ---
 

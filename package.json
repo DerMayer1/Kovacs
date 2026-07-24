@@ -2,6 +2,7 @@
   "name": "kovacs",
   "version": "0.3.3",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "description": "A local-first, evidence-driven Staff Engineer operating system powered by Codex CLI.",
   "engines": {

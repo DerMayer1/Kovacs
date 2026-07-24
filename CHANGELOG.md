@@ -14,6 +14,7 @@ boundaries when accompanied by an explicit migration.
 - Windows GitHub Actions quality gate with locked dependency installation.
 - Contributor, security, and release operating documentation.
 - Canonical `npm run ci` command and Node version declaration.
+- Apache License 2.0.
 
 ### Changed
 

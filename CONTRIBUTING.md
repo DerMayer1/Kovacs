@@ -90,3 +90,6 @@ docs: clarify local data retention
 
 Do not mix unrelated cleanup, product behavior, and documentation into one
 commit.
+
+Unless explicitly stated otherwise, intentionally submitted contributions are
+licensed under the repository's Apache License 2.0.
