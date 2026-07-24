@@ -55,6 +55,7 @@ src/
 
   application/
     coaching/            Manual coaching service and bounded project context
+    diagnostics/         Deterministic health policy and stable exit semantics
     observation/         Event-driven observer and perception cascade
     operating-system/    Confirmed mission/week/day/checkpoint lifecycle
     planning/            Schema-constrained Codex planning adapter
@@ -63,6 +64,7 @@ src/
     codex/               Ephemeral, read-only Codex CLI gateway
     config/              Environment and local-data configuration
     contracts/           JSON Schema loading and validation
+    diagnostics/         Read-only local capability probes
     persistence/         Session, observation, and SQLite operating stores
     windows/             UI Automation, OCR, and Electron capture adapters
 
@@ -122,6 +124,8 @@ Changing one of these is a migration, not a folder cleanup.
    becomes known.
 7. New capabilities extend an existing module or add a capability-named module;
    they do not create a new version-named production directory.
+8. Operational diagnostics must not call a model, capture observed content, or
+   initialize durable application state.
 
 ## Tests and releases
 

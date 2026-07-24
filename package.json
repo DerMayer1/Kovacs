@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "ci": "npm run release:validate",
     "dev": "tsx src/cli.ts",
+    "doctor": "tsx src/cli.ts doctor",
     "start": "node dist/src/cli.js",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

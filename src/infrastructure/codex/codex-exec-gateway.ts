@@ -7,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import type { CoachingConfig } from "../config/coaching-config.js";
 import type { GatewayExecution, GatewayInvocation, ReasoningGateway } from "../../core/coaching/types.js";
 
-async function discoverCodex(configured: string | null): Promise<string> {
+export async function resolveCodexExecutable(configured: string | null): Promise<string> {
   if (configured) {
     await access(configured);
     return configured;
@@ -79,7 +79,7 @@ export class CodexExecGateway implements ReasoningGateway {
   constructor(private readonly config: CoachingConfig) {}
 
   async execute(invocation: GatewayInvocation): Promise<GatewayExecution> {
-    const executable = await discoverCodex(this.config.codexBinary);
+    const executable = await resolveCodexExecutable(this.config.codexBinary);
     const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "kovacs-codex-"));
     const outputPath = path.join(temporaryDirectory, "response.json");
     const isolatedCodexHome = path.join(temporaryDirectory, "codex-home");

@@ -165,6 +165,7 @@ Kovacs cannot:
 git clone https://github.com/DerMayer1/Kovacs.git
 cd Kovacs
 npm ci
+npm run doctor
 npm run release:validate
 ```
 
@@ -278,6 +279,7 @@ Denied title patterns override the application allowlist.
 | --- | --- |
 | `npm run kovacs` | Build and launch the V0.3.3 desktop presence. |
 | `npm run pet` | Legacy alias for `npm run kovacs`. |
+| `npm run doctor` | Diagnose local runtime capabilities without calling a model or creating state. |
 | `npm run typecheck` | Validate TypeScript without emitting files. |
 | `npm test` | Run the complete automated test suite. |
 | `npm run build` | Build the project. |
@@ -322,6 +324,7 @@ docs/                  Current architecture, release history, and pilot protocol
 Start with:
 
 - [Current architecture](./docs/ARCHITECTURE.md)
+- [Operations and local diagnostics](./docs/OPERATIONS.md)
 - [Contribution guide](./CONTRIBUTING.md)
 - [Security policy](./SECURITY.md)
 - [Changelog](./CHANGELOG.md)

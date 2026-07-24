@@ -12,6 +12,7 @@ const required = [
   "docs/assets/kovacs-narwhal.png",
   "src/core/security/local-sensitive-content-guard.ts", "test/security/trust-and-retrieval.test.ts", "benchmarks/v0.3.3/retrieval-cases.json",
   "scripts/releases/v0.3.3/smoke.ts", "scripts/releases/v0.3.3/evaluate-retrieval.ts",
+  "src/application/diagnostics/doctor.ts", "src/infrastructure/diagnostics/local-doctor.ts", "test/diagnostics/doctor.test.ts",
 ];
 record("T01", required.every((file) => existsSync(path.join(root, file))), `${required.filter((file) => existsSync(path.join(root, file))).length}/${required.length} V0.3.3 artifacts present`);
 

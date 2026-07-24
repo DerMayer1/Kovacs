@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { KovacsService } from "../../application/coaching/coaching-service.js";
 import { ASSISTANCE_LEVELS, MODES, PROFILES, SENSITIVITY_LEVELS, type AssistanceLevel, type Mode, type Profile, type Sensitivity } from "../../core/coaching/types.js";
+import { doctorExitCode, type DoctorReport } from "../../application/diagnostics/doctor.js";
+import { diagnoseLocalSystem } from "../../infrastructure/diagnostics/local-doctor.js";
 
 interface ParsedArguments {
   command: string | null;
@@ -54,7 +56,8 @@ function enumValue<T extends string>(candidate: string | undefined, options: rea
 }
 
 function help(): string {
-  return `Kovacs V0.1 — explicit, read-only staff-engineer tutoring\n\n` +
+  return `Kovacs 0.3.3 — local-first, advisory engineering practice\n\n` +
+    `  doctor  [--json]  Verify local capabilities without calling a model\n` +
     `  start   --project PATH --task TEXT [--mode training|pair|assessment]\n` +
     `          PATH TEXT [training|pair|assessment]  (PowerShell-safe positional form)\n` +
     `  coach   --session ID --request TEXT [context options]\n` +
@@ -83,15 +86,38 @@ function renderResponse(result: Awaited<ReturnType<KovacsService["intervene"]>>)
   ].filter((line, index, all) => line !== "" || (index > 0 && all[index - 1] !== "")).join("\n");
 }
 
-export async function runCli(argv = process.argv.slice(2)): Promise<number> {
+export function renderDoctorReport(report: DoctorReport): string {
+  const checks = report.checks.map((check) =>
+    `${check.status.toUpperCase().padEnd(4)} ${check.label.padEnd(22)} ${check.summary}`,
+  );
+  return [
+    `Kovacs Doctor — ${report.overall.toUpperCase()}`,
+    "",
+    ...checks,
+    "",
+    "Model calls: 0",
+  ].join("\n");
+}
+
+export interface CliDependencies {
+  doctor?: () => Promise<DoctorReport>;
+}
+
+export async function runCli(argv = process.argv.slice(2), dependencies: CliDependencies = {}): Promise<number> {
   const parsed = parseArguments(argv);
   if (!parsed.command || parsed.command === "help" || parsed.flags.has("help")) {
     console.log(help());
     return 0;
   }
 
-  const service = await KovacsService.create();
   const asJson = parsed.flags.has("json");
+  if (parsed.command === "doctor") {
+    const report = await (dependencies.doctor ?? diagnoseLocalSystem)();
+    console.log(asJson ? JSON.stringify(report, null, 2) : renderDoctorReport(report));
+    return doctorExitCode(report);
+  }
+
+  const service = await KovacsService.create();
   if (parsed.command === "start") {
     const positional = [...parsed.positionals];
     const projectInput = value(parsed.flags, "project") ?? positional.shift();

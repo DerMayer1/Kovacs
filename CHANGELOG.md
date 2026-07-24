@@ -15,6 +15,7 @@ boundaries when accompanied by an explicit migration.
 - Contributor, security, and release operating documentation.
 - Canonical `npm run ci` command and Node version declaration.
 - Apache License 2.0.
+- Read-only `kovacs doctor` diagnostics with human and JSON output.
 
 ### Changed
 

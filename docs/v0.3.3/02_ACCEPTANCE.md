@@ -21,3 +21,14 @@ The automated gate requires:
 - source inspection confirms Codex CLI remains the sole reasoning gateway and external actions remain impossible.
 
 `npm run retrieval:evaluate` prints the deterministic corpus result. It consumes no model usage.
+
+Operational diagnosis is separate from the automated release gate because it
+checks the current machine:
+
+```powershell
+npm run doctor
+npm run doctor -- --json
+```
+
+Doctor must perform zero model calls, create no application state, redact local
+paths, and return non-zero when a required local capability fails.
