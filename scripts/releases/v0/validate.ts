@@ -45,9 +45,9 @@ const REQUIRED_ARTIFACTS = [
   "contracts/v0/reasoning-request.schema.json",
   "contracts/v0/reasoning-response.schema.json",
   "contracts/v0/scenario.schema.json",
-  "v0/policy.ts",
-  "v0/scenarios.ts",
-  "v0/validate.ts",
+  "scripts/releases/v0/policy.ts",
+  "scripts/releases/v0/scenarios.ts",
+  "scripts/releases/v0/validate.ts",
 ];
 
 const schemaFiles = [
@@ -215,7 +215,7 @@ function buildMetrics(): Metric[] {
     "--output-schema",
     "timeout",
   ];
-  const v0Code = ["v0/policy.ts", "v0/scenarios.ts"]
+  const v0Code = ["scripts/releases/v0/policy.ts", "scripts/releases/v0/scenarios.ts"]
     .map((file) => fs.readFileSync(path.join(ROOT, file), "utf8"))
     .join("\n");
   const forbiddenSensorImplementations = [
