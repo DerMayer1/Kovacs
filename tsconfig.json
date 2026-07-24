@@ -15,6 +15,6 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "v0/**/*.ts", "v01/**/*.ts", "v02/**/*.ts", "v03/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/releases/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

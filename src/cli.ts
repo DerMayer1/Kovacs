@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runCli } from "./v01/cli.js";
+import { runCli } from "./interfaces/cli/terminal.js";
 
 runCli().then(
   (code) => { process.exitCode = code; },
